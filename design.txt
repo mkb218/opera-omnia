@@ -1,4 +1,4 @@
-server indexes segments by chroma and timbre vectors. Chroma values bucketed by 0.01, timbre values bucketed by sign and log10(abs(x)). length is adjusted on output. segments stored as raw samples
+server indexes segments by chroma and timbre vectors. Chroma values bucketed by 0.01, timbre values bucketed by sign and log10(abs(x)). length and loudness are adjusted on output. segments stored as raw samples. maybe index by distance from previous beat or tatum also
 
 sound files uploaded can be specified as corpus only or as songs to be resynthesized.
 

@@ -2,16 +2,8 @@ package main
 
 import "log"
 import "net/http"
-import "html/template"
 import "flag"
 
-func IndexHandler(templateroot string) func(resp http.ResponseWriter, req *http.Request), error {
-	
-}
-
-type StorageMgr struct {
-	
-}
 
 func main() {
 	template := flag.String("template", "templates", "path to templates")
@@ -26,11 +18,12 @@ func main() {
 		log.Panic(err)
 	}
 	log.Printf("initing storage manager")
-	storageMgr := initStorageMgr(*storagedir)
+	storageMgr := InitStorageMgr(*storagedir)
 	http.HandleFunc("/", ihandler) // serves upload template
 	http.HandleFunc("/upload", UploadHandler(storageMgr))
 	go Streamer(storageMgr)
-	http.HandleFunc("/stream", StreamHandler(serveraddress, serverport)) // stream handler will basically redirect to the icecast server
+	http.HandleFunc("/stream", StreamHandler(serveraddress, serverport))
+	 // stream handler will basically redirect to the icecast server
 	http.Handle("/", r)
 	http.ListenAndServe(":3920", nil)
 }
