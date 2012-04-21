@@ -1,0 +1,43 @@
+server indexes segments by chroma and timbre vectors. Chroma values bucketed by 0.01, timbre values bucketed by sign and log10(abs(x)). length is adjusted on output. segments stored as raw samples
+
+sound files uploaded can be specified as corpus only or as songs to be resynthesized.
+
+web app will take anything we can give to echonest as profile ID. server side sends on channel to queue
+
+one goroutine to pop song requests from a channel and add to queue, then pop one to queue onto recreate channel
+
+one goroutine will pop songs to be recreated from recreation channel and recreate and queue for 
+
+one goroutine to act as icecast source, bind libshout. libshout needs to lock os thread!
+
+
+will need latest bootstrap and jquery i guess. worry about that part secondary to server
+
+pseudo code:
+
+type request {
+	id string
+	resynth bool
+	audio []byte
+}
+
+if request has data {
+	calculate md5, check for analysis on echonest
+	if analysis is present {
+	    store segments
+	} else {
+		send to analyzer and wait. 
+		store segments
+	}
+}
+
+type segment {
+	duration float64
+	chroma [12]float64
+	timbre [12]float64
+}
+
+type analysisbank struct {
+	lock sync.Mutex
+	bank map[string][]segment // string is id
+}
