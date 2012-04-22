@@ -5,6 +5,8 @@ import "net/http"
 import "log"
 import "path"
 import "html/template"
+import "os"
+import "io"
 
 var RequestQueue chan string
 var AudioQueue chan AudioRequest
@@ -17,9 +19,51 @@ type AudioRequest struct {
 
 func (a *AudioRequest) Read(b []byte) (n int, err error) {
 	// if leftover is not empty, copy to b
-	// if b is still not empty, open next Segment's file, read all contents and copy as much to b as will fit
+	if len(a.leftover) > 0 {
+		if len(a.leftover) > len(b) {
+			copy(b, a.leftover[0:len(b)])
+			a.leftover = a.leftover[len(b):]
+			return len(b), nil
+		} else {
+			copy(b, a.leftover)
+			n += len(a.leftover)
+			b = b[n:]
+			a.leftover = a.leftover[:0]
+		}
+	}
+	
+	if len(b) > 0 {
+		// if b is still not empty, open next Segment's file, read all contents and copy as much to b as will fit
+		s := a.segments[0]
+		a.segments = a.segments[1:]
+		var junk os.FileInfo
+		junk, err = os.Stat(s.File)
+		if err != nil {
+			return
+		}
+		
+		buf := make([]byte, junk.Size())
+		
+		
+		var fi *os.File
+		fi, err = os.Open(s.File)
+		if err != nil {
+			return
+		}
+		defer fi.Close()
+
+		n, err = fi.Read(buf)
+		if err != nil && err != io.EOF {
+			return
+		}
+		copy(b, buf)
+		a.leftover = buf[len(b):]
+		
+	}
+		
 	// copy rest to leftover
 	// if no more segments, return EOF
+	return
 }
 
 func RequestProc() {
