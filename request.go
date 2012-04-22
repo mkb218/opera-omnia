@@ -25,12 +25,13 @@ type SegSortSlice struct {
 }
 
 const TimbreWeight = 1
-const PitchWeight = 1
+const PitchWeight = 10
 const LoudStartWeight = 1
 const LoudMaxWeight = 1
 const DurationWeight = 1
 const BeatWeight = 1
 const ConfidenceWeight = 1
+const IdentityWeight = 10000
 
 func Distance(s, s0 *Segment) float64 {
     var timbre = timbre_distance(s, s0)
@@ -43,6 +44,9 @@ func Distance(s, s0 *Segment) float64 {
     var distance = timbre * TimbreWeight + pitch * PitchWeight + 
         sloudStart * LoudStartWeight + sloudMax * LoudMaxWeight + 
         duration * DurationWeight + confidence * ConfidenceWeight + bdist * BeatWeight
+	if s.Id == s0.Id {
+		distance += IdentityWeight
+	}
     return distance
 }
 
@@ -89,7 +93,13 @@ type AudioRequest struct {
 	leftover []byte
 }
 
+var readcalls int
+
 func (a *AudioRequest) Read(b []byte) (n int, err error) {
+	readcalls++
+	if readcalls % 10 == 0 {
+		log.Println(readcalls, "readcalls", len(a.segments), "remaining segs")
+	}
 	// if leftover is not empty, copy to b
 	if len(a.leftover) > 0 {
 		if len(a.leftover) > len(b) {
@@ -104,22 +114,32 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 		}
 	}
 	
-	if len(b) > 0 {
+	if len(b) > 0 && len(a.segments) > 0 {
 		// if b is still not empty, open next Segment's file, read all contents and copy as much to b as will fit
 		s := a.segments[0]
 		a.segments = a.segments[1:]
+		log.Println(s.Id, s.Index)
 		var buf []byte
 		buf, err = ioutil.ReadFile(s.File)
 		if err != nil && err != io.EOF {
 			return
 		}
 		copy(b, buf)
-		a.leftover = buf[len(b):]
+		if len(buf) > len(b) {
+			n += len(b)
+			a.leftover = buf[len(b):]
+		} else {
+			n += len(buf)
+		}
 		
 	}
 		
 	// copy rest to leftover
 	// if no more segments, return EOF
+	if len(a.segments) == 0 && len(a.leftover) == 0 {
+		err = io.EOF
+	}
+	log.Println("wrote", n, "bytes")
 	return
 }
 
@@ -156,10 +176,13 @@ func RequestProc() {
 			ss.root = segment
 			ss.slice = allSegs.segs
 			sort.Sort(ss)
-			ar.segments = append(ar.segments, ss.slice[0])
+			if len(ss.slice) > 0 {
+				ar.segments = append(ar.segments, ss.slice[0])
+			}
 		}
 		allSegs.Unlock()
-			
+		ar.artist = s.artist
+		ar.title = s.title
 		
 		// write to audio queue
 		go func() { AudioQueue <- ar } ()

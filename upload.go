@@ -120,37 +120,40 @@ func SetSegmentsForID(id string, segments Analysis) {
 }
 
 func DetailsForID(url, id string) (a Analysis, err error) {
+	log.Println("DetailsForID", id, url)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Println("couldn't get details for ", id)
-		response.Body.Close()
 		return Analysis{}, err
 	}
+	log.Println("got", response.ContentLength, "bytes")
 	
-	details := make(map[string]interface{}, 3)
+	var details interface{}
 	j := json.NewDecoder(response.Body)
-	j.Decode(details)
+	j.Decode(&details)
 	response.Body.Close()
 	artist := mapKey(mapKey(details, "meta"), "artist")
 	title := mapKey(mapKey(details, "meta"), "title")
 	switch t := artist.(type) {
 	case string:
 		a.artist = t
+		log.Println("artist", artist)
 	default:
 		log.Println("no artist available")
 	}
 	switch t := title.(type) {
 	case string:
 		a.title = t
+		log.Println("title", title)
 	default:
 		log.Println("no title available")
 	}
-	jsegments, ok := mapKey(mapKey(details, "track"), "segments").([]interface{})
+	jsegments, ok := mapKey(details, "segments").([]interface{})
 	if !ok {
 		log.Println("no segments available for", id)
 		return Analysis{}, err
 	}
-	jbeats, ok := mapKey(mapKey(details, "track"), "beats").([]interface{})
+	jbeats, ok := mapKey(details, "beats").([]interface{})
 	if !ok {
 		log.Println("no beats available for", id)
 		return Analysis{}, err
@@ -219,6 +222,7 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 			}
 		}
 	}
+	log.Println("details OK")
 	return a, nil
 }
 
@@ -239,7 +243,7 @@ func UploadProc() {
 		// md5 data and see if we have analysis already
 		var m md5sum
 		hasher.Write(r.Data)
-		hasher.Sum(m[:])
+		copy(m[:], hasher.Sum(nil))
 		hasher.Reset()
 		var id string
 		var ok bool
@@ -247,20 +251,17 @@ func UploadProc() {
 		var url string
 		var err error
 		if id, ok = GetIDForChecksum(m); !ok {
+			log.Println("no id for md5", m)
 			// if not upload it to analyzer.
 			id, url, err = e.Upload(r.Filetype, r.Data)
 			if err != nil {
 				log.Println("error uploading track to EN", err)
 				continue
 			}
+			log.Println("got ID", id, "url", url, "err", err)
 			
 			// update md5 to id mapping
 			AddIDForChecksum(m, id)
-		}
-
-		// if request is marked "playback" add the ID to the request queue
-		if r.Playback {
-			go func() { RequestQueue <- id }()
 		}
 
 		// if it comes back with an ID that we have, then great! 
@@ -272,9 +273,15 @@ func UploadProc() {
 				log.Println("error getting details from EN", err)
 				continue
 			}
+			SetSegmentsForID(id, a)
 		}
+
 		// these need to be backed up on disk
 		// once we have analysis:
+		// if request is marked "playback" add the ID to the request queue
+		if r.Playback {
+			go func() { RequestQueue <- id }()
+		}
 		
 		// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
 		if r.Add {
@@ -286,21 +293,30 @@ func UploadProc() {
 			c.Stdin = bytes.NewReader(r.Data)
 			sbuf := new(bytes.Buffer)
 			c.Stdout = sbuf
+			errbuf := new(bytes.Buffer)
+			c.Stderr = errbuf
 			// use samplerate from args, 16 bits, big endian, two channels
+			err = c.Start()
+			if err != nil {
+				log.Println("error starting sox", err)
+				continue
+			}
 			err = c.Wait()
 			if err != nil {
-				log.Println("error running sox", err)
+				log.Println("error running sox", err, string(errbuf.Bytes()))
+				continue
 			}
 			// put raw samples into files
 			for i := range a.segments {
-				filename := id + strconv.Itoa(a.segments[i].Index)
+				filename := id + "_" + strconv.Itoa(a.segments[i].Index)
 				filename = path.Join(samplepath, filename)
 				file, err := os.Create(filename)
 				if err != nil {
 					log.Println("couldn't open file", filename, err)
 					continue
 				}
-				bytecount := int(a.segments[i].Duration * float64(samplerate * 4)) // 2 bytes per sample * 2 channels per frame
+				bytecount := int(a.segments[i].Duration * float64(samplerate)) * 4 // 2 bytes per sample * 2 channels per frame
+				// log.Println(a.segments[i].Duration, bytecount)
 				_, err = file.Write(sbuf.Next(bytecount))
 				if err != nil {
 					log.Println("error writing sample", err)
@@ -310,8 +326,11 @@ func UploadProc() {
 				
 			}
 			// add to all segments
-			
+			log.Println("adding to all segs")
+			AddToAllSegs(a.segments)
+			log.Println("done adding to all segs")
 		}
+
 	}
 }
 

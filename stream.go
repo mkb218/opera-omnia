@@ -15,6 +15,7 @@ import "unsafe"
 import "time"
 import "os"
 import "path"
+import "strings"
 
 var bitrate int
 var samplerate int
@@ -58,6 +59,7 @@ func StreamProc() {
 	C.shout_init()
 	shout_ok := false
 	shout := C.shout_new()
+	i := 0
 	{
 		if shout == nil {
 			log.Print("couldn't allocate shout_t")
@@ -109,12 +111,11 @@ func StreamProc() {
 	}
 		
 	LOOP: for f := range FileQueue {
-		i := 0
 		if dumpraw {
 			go func() {
-				p := f.artist + "-" + f.title + strconv.Itoa(i)
+				p := f.artist + "-" + f.title + strconv.Itoa(i) + ".mp3"
 				i++
-				p = path.Join(dumppath, p)
+				p = path.Join(dumppath, strings.Replace(p, "/", "_", -1))
 				file, err := os.Create(p)
 				if err != nil {
 					log.Println("creating raw dump file failed :(", err)
@@ -136,6 +137,7 @@ func StreamProc() {
 			sleeptime := C.shout_delay(shout)
 			time.Sleep(time.Duration(sleeptime) * time.Millisecond)
 		}
+		i++
 	}
 	
 	C.shout_close(shout) // what if there's an error? WHO CARES I'M DYING
@@ -147,6 +149,7 @@ func StreamProc() {
 func FileProc() {
 	log.Print("starting FileProc")
 	for ar := range AudioQueue {
+		log.Println("from AudioQueue", ar.artist, ar.title)
 		f := File{ar.artist, ar.title, make([]byte,0)}
 		p, err := exec.LookPath("lame")
 		if err != nil {
@@ -156,9 +159,15 @@ func FileProc() {
 		c := exec.Command(p, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", "-")
 		c.Stdin = &ar
 		c.Stdout = &f
+		err = c.Start()
+		if err != nil {
+			log.Print("couldn't start lame ",ar.artist, ar.title, " :( ", err)
+			continue
+		}
 		err = c.Wait()
 		if err != nil {
 			log.Print("encoding failed for ",ar.artist, ar.title, " :( ", err)
+			continue
 		}
 		FileQueue <- f
 	}
