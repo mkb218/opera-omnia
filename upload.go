@@ -14,7 +14,6 @@ import "path"
 import "strconv"
 import "sync"
 import "github.com/mkb218/egonest/src/echonest"
-//import "sort"
 
 func mapKey(in interface{}, k string) interface{} {
 	if m, ok := in.(map[string]interface{}); ok {
@@ -23,6 +22,19 @@ func mapKey(in interface{}, k string) interface{} {
 		}
 	}
 	return nil
+}
+
+type AllSegs struct {
+	sync.Mutex
+	segs []Segment
+}
+
+var allSegs AllSegs
+
+func AddToAllSegs(in []Segment) {
+	allSegs.Lock()
+	allSegs.segs = append(allSegs.segs, in...)
+	allSegs.Unlock()
 }
 
 type UploadRequest struct {
@@ -67,20 +79,6 @@ func AddIDForChecksum(m md5sum, id string) {
 	// dump to gobfile
 }
 
-type distIndex struct {
-	Id string
-	Index string
-}
-
-type SegSortSlice struct {
-	root Segment
-	slice []Segment
-	distance map[distIndex]float64
-}
-
-func (s SegSortSlice) Less(root Segment) {
-}
-
 type Segment struct {
 	Id string
 	Index int
@@ -121,6 +119,110 @@ func SetSegmentsForID(id string, segments Analysis) {
 	// write to gob
 }
 
+func DetailsForID(url, id string) (a Analysis, err error) {
+	response, err := http.Get(url)
+	if err != nil {
+		log.Println("couldn't get details for ", id)
+		response.Body.Close()
+		return Analysis{}, err
+	}
+	
+	details := make(map[string]interface{}, 3)
+	j := json.NewDecoder(response.Body)
+	j.Decode(details)
+	response.Body.Close()
+	artist := mapKey(mapKey(details, "meta"), "artist")
+	title := mapKey(mapKey(details, "meta"), "title")
+	switch t := artist.(type) {
+	case string:
+		a.artist = t
+	default:
+		log.Println("no artist available")
+	}
+	switch t := title.(type) {
+	case string:
+		a.title = t
+	default:
+		log.Println("no title available")
+	}
+	jsegments, ok := mapKey(mapKey(details, "track"), "segments").([]interface{})
+	if !ok {
+		log.Println("no segments available for", id)
+		return Analysis{}, err
+	}
+	jbeats, ok := mapKey(mapKey(details, "track"), "beats").([]interface{})
+	if !ok {
+		log.Println("no beats available for", id)
+		return Analysis{}, err
+	}
+	
+	jb0, ok := jbeats[0].(map[string]interface{})
+	jb1, ok := jbeats[1].(map[string]interface{})
+	jbeats = jbeats[2:]
+	
+	b0, ok := jb0["start"].(float64)
+	if !ok {
+		log.Println("no beat start time")
+		b0 = 0
+	}
+
+	b1, ok := jb1["start"].(float64)
+	if !ok {
+		log.Println("no beat start time")
+		b1 = 0
+	}
+	
+	a.segments = make([]Segment, len(jsegments))
+	SEG: for index, is := range jsegments {
+		s := is.(map[string]interface{})
+		a.segments[index].Id = id
+		a.segments[index].Index = index
+		a.segments[index].Start = s["start"].(float64)
+		a.segments[index].Duration = s["duration"].(float64)
+		a.segments[index].LoudnessStart = s["loudness_start"].(float64)
+		a.segments[index].LoudnessMax  = s["loudness_max"].(float64)
+		a.segments[index].Confidence  = s["confidence"].(float64)
+		if a.segments[index].Start > b1 {
+			b0 = b1
+			if len(jbeats) > 0 {
+				jb := jbeats[0]
+				jbeats = jbeats[1:]
+				b1, ok = mapKey(jb,"start").(float64)
+				if !ok {
+					b1 = 0
+				}
+			}
+		}
+		a.segments[index].BeatDistance = a.segments[index].Start - b0
+		p, ok := s["pitches"].([]interface{})
+		if !ok {
+			log.Println("no pitch info")
+			continue
+		}
+		
+		t, ok := s["timbre"].([]interface{})
+		if !ok {
+			log.Println("no timbre info")
+			continue
+		}
+		
+		for i := 0; i < 12; i++ {
+			a.segments[index].Pitches[i], ok = p[i].(float64)
+			if !ok {
+				log.Println("can't coerce p element to float64")
+				continue SEG
+			}
+			a.segments[index].Timbre[i], ok = t[i].(float64)
+			if !ok {
+				log.Println("can't coerce t element to float64")
+				continue SEG
+			}
+		}
+	}
+	return a, nil
+}
+
+
 func UploadProc() {
 	log.Print("starting upload proc")
 	// read md5 to ID mapping
@@ -154,9 +256,6 @@ func UploadProc() {
 			
 			// update md5 to id mapping
 			AddIDForChecksum(m, id)
-			// if it comes back with an ID that we have, then great! 
-			// if not then fetch the detailed analysis
-			// update id to analysis mapping
 		}
 
 		// if request is marked "playback" add the ID to the request queue
@@ -164,107 +263,15 @@ func UploadProc() {
 			go func() { RequestQueue <- id }()
 		}
 
+		// if it comes back with an ID that we have, then great! 
+		// if not then fetch the detailed analysis
+		// update id to analysis mapping
 		if a, ok = GetSegmentsForID(id); !ok {
-			response, err := http.Get(url)
+			a, err = DetailsForID(url, id)
 			if err != nil {
-				log.Println("couldn't get details for ", id)
-				response.Body.Close()
+				log.Println("error getting details from EN", err)
 				continue
 			}
-			
-			details := make(map[string]interface{}, 3)
-			j := json.NewDecoder(response.Body)
-			j.Decode(details)
-			response.Body.Close()
-			artist := mapKey(mapKey(details, "meta"), "artist")
-			title := mapKey(mapKey(details, "meta"), "title")
-			switch t := artist.(type) {
-			case string:
-				a.artist = t
-			default:
-				log.Println("no artist available")
-			}
-			switch t := title.(type) {
-			case string:
-				a.title = t
-			default:
-				log.Println("no title available")
-			}
-			jsegments, ok := mapKey(mapKey(details, "track"), "segments").([]interface{})
-			if !ok {
-				log.Println("no segments available for", id)
-				continue
-			}
-			jbeats, ok := mapKey(mapKey(details, "track"), "beats").([]interface{})
-			if !ok {
-				log.Println("no beats available for", id)
-				continue
-			}
-			
-			jb0, ok := jbeats[0].(map[string]interface{})
-			jb1, ok := jbeats[1].(map[string]interface{})
-			jbeats = jbeats[2:]
-			
-			b0, ok := jb0["start"].(float64)
-			if !ok {
-				log.Println("no beat start time")
-				b0 = 0
-			}
-
-			b1, ok := jb1["start"].(float64)
-			if !ok {
-				log.Println("no beat start time")
-				b1 = 0
-			}
-			
-			a.segments = make([]Segment, len(jsegments))
-			SEG: for index, is := range jsegments {
-				s := is.(map[string]interface{})
-				a.segments[index].Id = id
-				a.segments[index].Index = index
-				a.segments[index].Start = s["start"].(float64)
-				a.segments[index].Duration = s["duration"].(float64)
-				a.segments[index].LoudnessStart = s["loudness_start"].(float64)
-				a.segments[index].LoudnessMax  = s["loudness_max"].(float64)
-				a.segments[index].Confidence  = s["confidence"].(float64)
-				if a.segments[index].Start > b1 {
-					b0 = b1
-					if len(jbeats) > 0 {
-						jb := jbeats[0]
-						jbeats = jbeats[1:]
-						b1, ok = mapKey(jb,"start").(float64)
-						if !ok {
-							b1 = 0
-						}
-					}
-				}
-				a.segments[index].BeatDistance = a.segments[index].Start - b0
-				p, ok := s["pitches"].([]interface{})
-				if !ok {
-					log.Println("no pitch info")
-					continue
-				}
-				
-				t, ok := s["timbre"].([]interface{})
-				if !ok {
-					log.Println("no timbre info")
-					continue
-				}
-				
-				for i := 0; i < 12; i++ {
-					a.segments[index].Pitches[i], ok = p[i].(float64)
-					if !ok {
-						log.Println("can't coerce p element to float64")
-						continue SEG
-					}
-					a.segments[index].Timbre[i], ok = t[i].(float64)
-					if !ok {
-						log.Println("can't coerce t element to float64")
-						continue SEG
-					}
-				}
-			}
-				
 		}
 		// these need to be backed up on disk
 		// once we have analysis:
@@ -303,6 +310,7 @@ func UploadProc() {
 				
 			}
 			// add to all segments
+			
 		}
 	}
 }
