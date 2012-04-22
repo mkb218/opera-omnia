@@ -1,0 +1,30 @@
+<html>
+	<head><title>Opera Omnia</title></head>
+	<body>
+		<h1>Opera Omnia</h1>
+		<h2>Opera Omnia plays a song with pieces of many other songs.</h2>
+		<p>You have some difficult choices to make.</p>
+		<p>If you want to hear a song played back using the library, you can upload it (check the "play it back" box), or enter its Echonest ID if you have it.</p>
+		<p>If you want to add a piece of audio to the library, upload it and check the "add to library" box.</p>
+		<form action="/upload" method="post" enctype="multipart/form-data">
+			<p>File: <input type="file" name="filedata" /></p>
+			<p>File type (required!):
+				<label for="mp3">MP3 <input type="radio" name="filetype" id="mp3" value="mp3"/></label>
+				<label for="ogg">Ogg <input type="radio" name="filetype" id="ogg" value="ogg"/></label>
+				<label for="wav">WAV <input type="radio" name="filetype" id="wav" value="wav"/></label>
+				<label for="au">AU <input type="radio" name="filetype" id="au" value="au"/></label>
+				<label for="mp4">MP4 <input type="radio" name="filetype" id="mp4" value="mp4"/></label>
+				<label for="m4a">M4A <input type="radio" name="filetype" id="m4a" value="m4a"/></label>
+			</p>
+			<p><label for="playback"><input type="checkbox" id="playback" name="playback" />Play this back with the library!</label><br />
+				<label for="add"><input type="checkbox" id="add" name="add" />Add this file to the library!</label></p>
+			<p><input type="Submit" value="Upload!"/></p></form>
+		</form>
+		<form action="/request" method="post">
+			<p><label for="id">Echo Nest ID: <input type="text" name="id" id="id" /></label></p>
+			<p><input type="Submit" value="Request!" /></p>
+		</form>
+		<p>Once you've uploaded, listen to <a href="/stream">the stream</a>. If you don't have anything to upload, or any requests, you can do that now.</p>
+		<h6>&copy; Matt Kane 2012. A product of <a href="http://rethink.musichackathon.org/">the Rethink Music Hackers' Weekend</a>. <a href="http://github.com/mkb218/opera-omnia">github</a>. <a href="http://twitter.com/nynexrepublic">@nynexrepublic</a>. <a href="http://nynex.hydrogenproject.com">blog</a>.</h6>
+	</body>
+</html>

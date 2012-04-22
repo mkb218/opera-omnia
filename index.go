@@ -1,25 +1,31 @@
 package main
 
+import "log"
 import "net/http"
 import "html/template"
-import "flag"
+//import "flag"
 import "os"
 import "path"
-
-var templateRoot = "/Users/mkb/code/opera-omnia/templates";
+import "strings"
 
 func init() {
-	flag.StringVar(&templateRoot, "templates", templateRoot, "")
 	http.HandleFunc("/", IndexHandler)
 }
 
 func IndexHandler(resp http.ResponseWriter, req *http.Request) {
 	// get template
 	p := req.URL.Path
-	if p == "/" {
+	if p == "/" || p == "" {
 		p = "/index.html"
 	}
-	t, err := template.ParseFiles(path.Join(templateRoot, req.URL.Path))
+	p = path.Join(templateRoot, p)
+	if !strings.HasSuffix(p, ".html") {
+		log.Print("serving raw file", p)
+		http.ServeFile(resp, req, p)
+		return
+	}
+	log.Print("serving template", p)
+	t, err := template.ParseFiles(p)
 	if err != nil {
 		if os.IsNotExist(err) {
 			http.Error(resp, "Template Not Found", 404)
