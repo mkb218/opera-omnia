@@ -91,6 +91,8 @@ type Segment struct {
 	Pitches [12]float64
 	Timbre [12]float64
 	File string
+	RootLoudness float64
+	RootDuration float64
 }
 
 type Analysis struct {

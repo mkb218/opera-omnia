@@ -7,8 +7,10 @@ import "log"
 import "path"
 import "html/template"
 import "io"
-import "io/ioutil"
+import "os"
 import "sort"
+import "encoding/binary"
+import "bytes"
 import "github.com/mkb218/egonest/src/echonest"
 
 var RequestQueue chan string
@@ -119,17 +121,50 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 		s := a.segments[0]
 		a.segments = a.segments[1:]
 		log.Println(s.Id, s.Index)
-		var buf []byte
-		buf, err = ioutil.ReadFile(s.File)
-		if err != nil && err != io.EOF {
+		bytecount := int(s.RootDuration * float64(samplerate)) * 4 // 2 channels * 2 bytes
+		buf := make([]byte, bytecount)
+		loudbuf := make([]byte, 0, bytecount)
+		file, err = os.Open(s.File)
+		if err != nil {
+			log.Println("error opening file", s.File, ":", err)
 			return
 		}
-		copy(b, buf)
-		if len(buf) > len(b) {
+		defer file.Close()
+		err = file.Read(buf)
+		if err != nil {
+			log.Println("error reading file", s.File, ":", err)
+			return
+		}
+
+		// adjust loudness
+		r := bytes.NewReader(buf)
+		w := bytes.NewBuffer(loudbuf)
+		var tmp [2]int16
+		for {
+			e := binary.Read(r, binary.BigEndian, tmp[:])
+			if e != nil {
+				if e == io.EOF {
+					break
+				} else {
+					log.Println("error reading from buffer", e)
+					break
+				}
+			}
+			tmp[0] = int16(float64(tmp[0]) * s.RootLoudness/s.LoudnessMax)
+			tmp[1] = int16(float64(tmp[1]) * s.RootLoudness/s.LoudnessMax)
+			e = binary.Write(w, binary.BigEndian, tmp[:])
+			if e != nil {
+				log.Println("error writing to buffer", e)
+				break
+			}
+		}
+		
+		copy(b, w.Bytes())
+		if w.Len() > len(b) {
 			n += len(b)
-			a.leftover = buf[len(b):]
+			a.leftover = w.Bytes()[len(b):]
 		} else {
-			n += len(buf)
+			n += len(w.Len())
 		}
 		
 	}
@@ -177,6 +212,9 @@ func RequestProc() {
 			ss.slice = allSegs.segs
 			sort.Sort(ss)
 			if len(ss.slice) > 0 {
+				outs := ss.slice[0]
+				outs.RootDuration = segment.Duration
+				outs.RootLoudness = segment.LoudnessMax
 				ar.segments = append(ar.segments, ss.slice[0])
 			}
 		}
