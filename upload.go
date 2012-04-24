@@ -17,6 +17,7 @@ import "time"
 import "encoding/base64"
 import "math/rand"
 import "errors"
+import "encoding/gob"
 import "io"
 import "github.com/mkb218/egonest/src/echonest"
 
@@ -98,6 +99,19 @@ type md5sum [16]byte
 
 var Md5toid md5toid = md5toid{ids:make(map[md5sum]string)}
 
+func InitIDForChecksum() {
+	Md5toid.Lock()
+	defer Md5toid.Unlock()
+	r, err := os.Open(path.Join(MapGobPath, "md5map"))
+	if err != nil {
+		log.Println("error opening map gob file", err)
+		return
+	}
+	defer r.Close()
+	g := gob.NewDecoder(r)
+	g.Decode(&Md5toid)
+}
+
 func GetIDForChecksum(m md5sum) (val string, ok bool) {
 	Md5toid.Lock()
 	defer Md5toid.Unlock()
@@ -110,6 +124,14 @@ func AddIDForChecksum(m md5sum, id string) {
 	defer Md5toid.Unlock()
 	Md5toid.ids[m] = id
 	// dump to gobfile
+	w, err := os.Create(path.Join(MapGobPath, "md5map"))
+	if err != nil {
+		log.Println("error creating gobfile for map", err)
+		return
+	}
+	defer w.Close()
+	g := gob.NewEncoder(w)
+	g.Encode(&Md5toid)
 }
 
 type Segment struct {
@@ -140,6 +162,19 @@ type ID2AnalysisResults struct {
 
 var id2analysis = ID2AnalysisResults{ids:make(map[string]Analysis)}
 
+func InitSegmentsForChecksum() {
+	id2analysis.Lock()
+	defer id2analysis.Unlock()
+	r, err := os.Open(path.Join(MapGobPath, "idamap"))
+	if err != nil {
+		log.Println("error opening idamap gob file", err)
+		return
+	}
+	defer r.Close()
+	g := gob.NewDecoder(r)
+	g.Decode(&id2analysis)
+}
+
 func GetSegmentsForID(id string) (s Analysis, ok bool) {
 	id2analysis.Lock()
 	defer id2analysis.Unlock()
@@ -152,6 +187,14 @@ func SetSegmentsForID(id string, segments Analysis) {
 	defer id2analysis.Unlock()
 	id2analysis.ids[id] = segments
 	// write to gob
+	w, err := os.Create(path.Join(MapGobPath, "idamap"))
+	if err != nil {
+		log.Println("error creating gobfile for idamap", err)
+		return
+	}
+	defer w.Close()
+	g := gob.NewEncoder(w)
+	g.Encode(&id2analysis)
 }
 
 func DetailsForID(url, id string) (a Analysis, err error) {
@@ -411,6 +454,8 @@ func init() {
 	flag.StringVar(&echonestkey, "echonestkey", "", "")
 	flag.StringVar(&tmpdir, "tmpdir", "/tmp", "")
 	
+	InitIDForChecksum()
+	InitSegmentsForChecksum()
 	UploadChan = make(chan UploadRequest)
 	gofuncs = append(gofuncs, UploadProc)
 	http.HandleFunc("/upload", UploadHandler)
