@@ -1,6 +1,7 @@
 package main
 
 import "fmt"
+import "unsafe"
 import "math"
 import "net/http"
 import "log"
@@ -8,9 +9,11 @@ import "path"
 import "html/template"
 import "io"
 import "os"
+import "os/exec"
 import "sort"
 import "encoding/binary"
 import "bytes"
+import "strconv"
 import "github.com/mkb218/egonest/src/echonest"
 
 var RequestQueue chan string
@@ -116,53 +119,32 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 		}
 	}
 	
+	soxp, err := exec.LookPath("sox")
+	if err != nil {
+		log.Panicln("couldn't find sox on PATH!", err)
+	}
+	// ideally we could keep reading segments until the read buffer is full
 	if len(b) > 0 && len(a.segments) > 0 {
 		// if b is still not empty, open next Segment's file, read all contents and copy as much to b as will fit
 		s := a.segments[0]
 		a.segments = a.segments[1:]
-		log.Println(s.Id, s.Index)
-		bytecount := int(s.RootDuration * float64(samplerate)) * 4 // 2 channels * 2 bytes
-		buf := make([]byte, bytecount)
-		loudbuf := make([]byte, 0, bytecount)
-		file, err = os.Open(s.File)
-		if err != nil {
-			log.Println("error opening file", s.File, ":", err)
-			return
+		
+		var db4 float64
+		if s.LoudnessMax > 0 {
+			dbr = 10*math.Log10(s.RootLoudness/s.LoudnessMax)
 		}
-		defer file.Close()
-		err = file.Read(buf)
+		sox := exec.Command(soxp, s.File, "-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", "-", "stretch", strconv.FormatFloat(s.RootDuration/s.Duration, 'g', -1, 64), "gain", strconv.FormatFloat(dbr, 'g', -1, 64))
+		sox.Stdout = new(bytes.Buffer)
+		err = sox.Run()
 		if err != nil {
-			log.Println("error reading file", s.File, ":", err)
-			return
+			log.Println("sox failed", err)
 		}
 
-		// adjust loudness
-		r := bytes.NewReader(buf)
-		w := bytes.NewBuffer(loudbuf)
-		var tmp [2]int16
-		for {
-			e := binary.Read(r, binary.BigEndian, tmp[:])
-			if e != nil {
-				if e == io.EOF {
-					break
-				} else {
-					log.Println("error reading from buffer", e)
-					break
-				}
-			}
-			tmp[0] = int16(float64(tmp[0]) * s.RootLoudness/s.LoudnessMax)
-			tmp[1] = int16(float64(tmp[1]) * s.RootLoudness/s.LoudnessMax)
-			e = binary.Write(w, binary.BigEndian, tmp[:])
-			if e != nil {
-				log.Println("error writing to buffer", e)
-				break
-			}
-		}
-		
-		copy(b, w.Bytes())
-		if w.Len() > len(b) {
+		buf := sox.Stdout.Bytes()
+		copy(b, buf)
+		if len(buf) > len(b) {
 			n += len(b)
-			a.leftover = w.Bytes()[len(b):]
+			a.leftover = buf[len(b):]
 		} else {
 			n += len(w.Len())
 		}
@@ -235,6 +217,9 @@ func init() {
 	AudioQueue = make(chan AudioRequest)
 	gofuncs = append(gofuncs, RequestProc)
 	http.HandleFunc("/request", RequestHandler)
+	if e != 0 {
+		log.Panicln("couldn't init sox library:", e)
+	}
 }
 
 func RequestHandler(resp http.ResponseWriter, req *http.Request) {

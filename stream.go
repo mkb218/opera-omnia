@@ -1,7 +1,6 @@
 package main
 
-// #cgo CFLAGS: -I/opt/local/include
-// #cgo LDFLAGS: -L/opt/local/lib -lshout
+// #cgo LDFLAGS: -lshout
 // #include <shout/shout.h>
 // #include <stdlib.h>
 import "C"
@@ -55,6 +54,7 @@ func init() {
 
 func StreamProc() {
 	log.Print("starting StreamProc")
+	runtime.GOMAXPROCS(runtime.GOMAXPROCS(-1)+1)
 	runtime.LockOSThread()
 	C.shout_init()
 	shout_ok := false
