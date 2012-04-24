@@ -23,9 +23,9 @@ func main() {
 	log.SetFlags(log.LstdFlags|log.Lshortfile)
 	if len(logger) > 0 {
 		if logger != "-" {
-			l, err := os.Create(*logger)
+			l, err := os.Create(logger)
 			if err != nil {
-				log.Print("Couldn't open logfile:", *logger, err, ". using stderr")
+				log.Print("Couldn't open logfile:", logger, err, ". using stderr")
 			} else {
 				defer l.Close()
 				log.SetOutput(l)
@@ -37,6 +37,7 @@ func main() {
 			} else {
 				log.SetOutput(w)
 			}
+		}
 	}
 	log.Print("I LIVE TO SERVE")
 	for _, g := range gofuncs {

@@ -13,6 +13,11 @@ import "os/exec"
 import "path"
 import "strconv"
 import "sync"
+import "time"
+import "encoding/base64"
+import "math/rand"
+import "errors"
+import "io"
 import "github.com/mkb218/egonest/src/echonest"
 
 func mapKey(in interface{}, k string) interface{} {
@@ -24,6 +29,34 @@ func mapKey(in interface{}, k string) interface{} {
 	return nil
 }
 
+var tmpdir string
+var tmpLock sync.Mutex
+var tmpnamesize = base64.URLEncoding.EncodedLen(8)
+
+func mktemp(prefix string) (*os.File, error) {
+	tmpLock.Lock()
+	defer tmpLock.Unlock()
+	for {
+		namen := rand.Int63()
+		var b []byte
+		for i := 0; i < 8; i++ {
+			b = append(b, byte(namen>>uint(i*8) & 0xff))
+		}
+		c := make([]byte, tmpnamesize)
+		base64.URLEncoding.Encode(c, b)
+		p := path.Join(tmpdir, string(c))
+		if f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666); err == nil {
+			return f, nil
+		} else {
+			log.Println("couldn't create tmp file", namen, "reason",err)
+			if !os.IsExist(err) {
+				return nil, err
+			}
+		}
+	}
+	panic("unreachable")
+}
+
 type AllSegs struct {
 	sync.Mutex
 	segs []Segment
@@ -33,8 +66,8 @@ var allSegs AllSegs
 
 func AddToAllSegs(in []Segment) {
 	allSegs.Lock()
+	defer allSegs.Unlock()
 	allSegs.segs = append(allSegs.segs, in...)
-	allSegs.Unlock()
 }
 
 type UploadRequest struct {
@@ -280,25 +313,9 @@ func UploadProc() {
 		
 		// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
 		if r.Add {
-			p, err := exec.LookPath("sox")
+			buf, err := openBuf(r.Data, r.Filetype)
 			if err != nil {
-				log.Fatalln("no sox installed!", err)
-			}
-			c := exec.Command(p, "-t", r.Filetype, "-", "-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", "-")
-			c.Stdin = bytes.NewReader(r.Data)
-			sbuf := new(bytes.Buffer)
-			c.Stdout = sbuf
-			errbuf := new(bytes.Buffer)
-			c.Stderr = errbuf
-			// use samplerate from args, 16 bits, big endian, two channels
-			err = c.Start()
-			if err != nil {
-				log.Println("error starting sox", err)
-				continue
-			}
-			err = c.Wait()
-			if err != nil {
-				log.Println("error running sox", err, string(errbuf.Bytes()))
+				log.Println("couldn't get sox to run", err)
 				continue
 			}
 			// put raw samples into files
@@ -312,7 +329,7 @@ func UploadProc() {
 				}
 				bytecount := int(a.segments[i].Duration * float64(samplerate)) * 4 // 2 bytes per sample * 2 channels per frame
 				// log.Println(a.segments[i].Duration, bytecount)
-				_, err = file.Write(sbuf.Next(bytecount))
+				_, err = file.Write(buf[:bytecount])
 				if err != nil {
 					log.Println("error writing sample", err)
 				}
@@ -334,14 +351,70 @@ func UploadProc() {
 	}
 }
 
+func openBuf(data []byte, filetype string) (obuf []byte, err error) {
+	p, err := exec.LookPath("sox")
+	if err != nil {
+		log.Fatalln("no sox installed!", err)
+	}
+	var c *exec.Cmd
+	var reader io.Reader
+	switch filetype {
+	case "mp3": fallthrough
+	case "wav": fallthrough
+	case "ogg": fallthrough
+	case "au":
+		reader = bytes.NewReader(data)
+	case "mp4": fallthrough
+	case "m4a":
+		// else write to tmpfile, then invoke sox, defer deletion of tmpfile. weak.
+		w, err := mktemp(filetype)
+		if err != nil {
+			log.Println("couldn't make tmp file", err)
+			return nil, err
+		}
+
+		defer func() { w.Close(); os.Remove(w.Name()) }()
+
+		var n int
+		n, err = w.Write(data)
+		if n != len(data) {
+			log.Println("couldn't write all data to tmp file!")
+		}
+		if err != nil {
+			log.Println("couldn't write to tmp file", w.Name(), err)
+			return nil, err
+		}
+		w.Seek(0, os.SEEK_SET)
+		reader = w
+	default:
+		return nil, errors.New("unrecognized filetype")
+	}
+
+	// use samplerate from args, 16 bits, big endian, two channels
+	c = exec.Command(p, "-t", filetype, "-", "-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", "-")
+	c.Stdin = reader
+	errbuf := new(bytes.Buffer)
+	c.Stderr = errbuf
+	obuf, err = c.Output()
+	if err != nil {
+		log.Println("error running sox", err, string(errbuf.Bytes()))
+		return nil, err
+	}
+	return
+}
+
+var rander *rand.Rand
+
 func init() {
 	flag.StringVar(&MapGobPath, "mapgobpath", "/Users/mkb/code/opera-omnia/gobs", "")
 	flag.StringVar(&samplepath, "samples", "/Users/mkb/code/opera-omnia/samples", "")
 	flag.StringVar(&echonestkey, "echonestkey", "", "")
+	flag.StringVar(&tmpdir, "tmpdir", "/tmp", "")
 	
 	UploadChan = make(chan UploadRequest)
 	gofuncs = append(gofuncs, UploadProc)
 	http.HandleFunc("/upload", UploadHandler)
+	rander = rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
 func UploadHandler(resp http.ResponseWriter, req *http.Request) {

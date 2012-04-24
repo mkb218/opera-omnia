@@ -1,17 +1,14 @@
 package main
 
 import "fmt"
-import "unsafe"
 import "math"
 import "net/http"
 import "log"
 import "path"
 import "html/template"
 import "io"
-import "os"
 import "os/exec"
 import "sort"
-import "encoding/binary"
 import "bytes"
 import "strconv"
 import "github.com/mkb218/egonest/src/echonest"
@@ -129,7 +126,7 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 		s := a.segments[0]
 		a.segments = a.segments[1:]
 		
-		var db4 float64
+		var dbr float64
 		if s.LoudnessMax > 0 {
 			dbr = 10*math.Log10(s.RootLoudness/s.LoudnessMax)
 		}
@@ -145,7 +142,7 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 			n += len(b)
 			a.leftover = buf[len(b):]
 		} else {
-			n += len(w.Len())
+			n += len(buf)
 		}
 		
 	}
