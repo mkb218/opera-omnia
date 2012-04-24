@@ -135,12 +135,11 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 		}
 		sox := exec.Command(soxp, s.File, "-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", "-", "stretch", strconv.FormatFloat(s.RootDuration/s.Duration, 'g', -1, 64), "gain", strconv.FormatFloat(dbr, 'g', -1, 64))
 		sox.Stdout = new(bytes.Buffer)
-		err = sox.Run()
+		var buf []byte
+		buf, err = sox.Output()
 		if err != nil {
 			log.Println("sox failed", err)
 		}
-
-		buf := sox.Stdout.Bytes()
 		copy(b, buf)
 		if len(buf) > len(b) {
 			n += len(b)
@@ -217,9 +216,6 @@ func init() {
 	AudioQueue = make(chan AudioRequest)
 	gofuncs = append(gofuncs, RequestProc)
 	http.HandleFunc("/request", RequestHandler)
-	if e != 0 {
-		log.Panicln("couldn't init sox library:", e)
-	}
 }
 
 func RequestHandler(resp http.ResponseWriter, req *http.Request) {
