@@ -277,13 +277,6 @@ func UploadProc() {
 			}
 			SetSegmentsForID(id, a)
 		}
-
-		// these need to be backed up on disk
-		// once we have analysis:
-		// if request is marked "playback" add the ID to the request queue
-		if r.Playback {
-			go func() { RequestQueue <- id }()
-		}
 		
 		// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
 		if r.Add {
@@ -331,6 +324,11 @@ func UploadProc() {
 			log.Println("adding to all segs")
 			AddToAllSegs(a.segments)
 			log.Println("done adding to all segs")
+		}
+
+		// if request is marked "playback" add the ID to the request queue
+		if r.Playback {
+			go func() { RequestQueue <- id }()
 		}
 
 	}
