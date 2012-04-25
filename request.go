@@ -181,22 +181,60 @@ func RequestProc() {
 		}
 
 		// once we get analysis, start grabbing samples
-		var ar AudioRequest
-		allSegs.Lock()
-		for _, segment := range s.segments {
-			// here is the slow part
-			var ss SegSortSlice
-			ss.root = segment
-			ss.slice = allSegs.segs
-			sort.Sort(ss)
-			if len(ss.slice) > 0 {
-				outs := ss.slice[0]
-				outs.RootDuration = segment.Duration
-				outs.RootLoudness = segment.LoudnessMax
-				ar.segments = append(ar.segments, ss.slice[0])
+		func() {
+			var ar AudioRequest
+			allSegs.Lock()
+			defer allSegs.Unlock()
+			for _, segment := range s.segments {
+				var ss SegSortSlice
+				m := make(map[SegmentID]bool)
+				var pitches = []int{12,12,12}
+				// find highest three pitches in segment
+				for note, p := range segment.Pitches[:] {
+					if pitches[0] == 12 || p > segment.Pitches[pitches[0]] {
+						pitches[2], pitches[1], pitches[0] = pitches[1], pitches[0], note
+					} else if pitches[1] == 12 || p > segment.Pitches[pitches[1]] {
+						pitches[2], pitches[1] = pitches[1], note
+					} else if pitches[2] == 12 || p > segment.Pitches[pitches[2]] {
+						pitches[2] = note
+					}
+				}
+
+				for index, n := range pitches {
+					if index == 0 {
+						for _, v := range allSegs.pitch[n].Segments[segment.Pitches[n] / allSegs.pitch[n].width] {
+							m[v] = true
+						}
+					} else {
+						for k := range m {
+							m[k] = false
+						}
+						
+						for _, v := range allSegs.pitch[n].Segments[segment.Pitches[n] / allSegs.pitch[n].width] {
+							if _, ok := m[v]; ok {
+								m[v] = true
+							}
+						}
+					}
+				}
+				
+				ss.slice = make([]Segment, 0, len(m))
+				for k, b := range m {
+					if b {
+						ss.slice = append(ss.slice, allSegs.segments[k])
+					}
+				}
+
+				ss.root = segment
+				sort.Sort(ss)
+				if len(ss.slice) > 0 {
+					outs := ss.slice[0]
+					outs.RootDuration = segment.Duration
+					outs.RootLoudness = segment.LoudnessMax
+					ar.segments = append(ar.segments, ss.slice[0])
+				}
 			}
-		}
-		allSegs.Unlock()
+		} ()
 		ar.artist = s.artist
 		ar.title = s.title
 		

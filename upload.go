@@ -58,17 +58,108 @@ func mktemp(prefix string) (*os.File, error) {
 	panic("unreachable")
 }
 
-type AllSegs struct {
-	sync.Mutex
-	segs []Segment
+type SegmentID struct {
+	Id string
+	Index int
 }
 
-var allSegs AllSegs
+var bucketsize int
+var initialbucketwidth float64
+
+type bucket struct {
+	width float64
+	Segments [][]SegmentID
+}
+
+var allSegs struct {
+	sync.Mutex
+	segs map[SegmentID]Segment
+//	timbre [12]bucket
+	pitch [12]bucket
+}
+
+func initAllSegs() {
+	allSegs.Lock()
+	defer allSegs.Unlock()
+	r, err := os.Open(path.Join(MapGobPath, "allsegs"))
+	if err != nil {
+		log.Println("error opening map gob file", err)
+		allSegs.segs = make(map[SegmentID]Segment)
+		for i := 0; i < 12; i++ {
+//			allSegs.timbre[i].width = initialbucketwidth
+			allSegs.pitch[i].width = initialbucketwidth
+		}
+	}
+	defer r.Close()
+	g := gob.NewDecoder(r)
+	g.Decode(&allSegs)
+}
+
+func balanceAllBuckets() {
+	allSegs.Lock()
+	defer allSegs.Unlock()
+	c := 0
+	for i := 0; i < 12; i++ {
+		// for j, r := range allSegs.timbre[i].Segments {
+		// 	if len(r) > bucketsize {
+		// 		c++
+		// 		balanceBuckets(&(allSegs.timbre[i]), "timbre", i)
+		// 		break
+		// 	}
+		// }
+			
+		for j, r := range allSegs.pitch[i].Segments {
+			if len(r) > bucketsize {
+				c++
+				balanceBuckets(&(allSegs.pitch[i]), "pitch", i)
+				break
+			}
+		}
+	}
+	log.Println("balanced",c,"buckets")
+}
+
+func balanceBuckets(b *bucket, field string, index int) {
+	b.width = b.width / 2
+	log.Println(field,i,"bucket width now",b.width)
+	olds := b.Segments
+	b.Segments = make([][]SegmentId, int(float64(1)/b.width))
+	for _, ss := range olds {
+		for _, s := range ss {
+			var trg float64
+			if field == "timbre" {
+				trg = allSegs.segs[s].Timbre[i]
+			} else {
+				trg = allSegs.segs[s].Pitch[i]
+			}
+			trg /= b.width
+			b.Segments[int(trg)] = append(b.Segments[int(trg)], s)
+		}
+	}
+}
 
 func AddToAllSegs(in []Segment) {
 	allSegs.Lock()
 	defer allSegs.Unlock()
-	allSegs.segs = append(allSegs.segs, in...)
+	for _, r := range in {
+		allSegs.segs[r.SegmentID] = r
+		for i := 0; i < 12; i++ {
+			// bucketnum := int(r.Timbre[i] / allSegs.timbre[i].width)
+			// allSegs.timbre[i].Segments[bucketnum] = append(allSegs.timbre[i].Segments[bucketnum], r.SegmentID)
+			bucketnum = int(r.Pitch[i] / allSegs.pitch[i].width)
+			allSegs.pitch[i].Segments[bucketnum] = append(allSegs.pitch[i].Segments[bucketnum], r.SegmentID)
+		}
+	}
+	balanceAllBuckets()
+	// dump to gobfile
+	w, err := os.Create(path.Join(MapGobPath, "allsegs"))
+	if err != nil {
+		log.Println("error creating gobfile for allsegs", err)
+		return
+	}
+	defer w.Close()
+	g := gob.NewEncoder(w)
+	g.Encode(&allSegs)
 }
 
 type UploadRequest struct {
@@ -135,8 +226,7 @@ func AddIDForChecksum(m md5sum, id string) {
 }
 
 type Segment struct {
-	Id string
-	Index int
+	SegmentID
 	Start float64
 	Duration float64
 	LoudnessStart float64
@@ -453,6 +543,8 @@ func init() {
 	flag.StringVar(&samplepath, "samples", "/Users/mkb/code/opera-omnia/samples", "")
 	flag.StringVar(&echonestkey, "echonestkey", "", "")
 	flag.StringVar(&tmpdir, "tmpdir", "/tmp", "")
+	flag.IntVar(&bucketsize, "bucketsize", 1000, "")
+	flag.Float64Var(&initialbucketwidth, "bucketwidth", 0.01, "")
 	
 	InitIDForChecksum()
 	InitSegmentsForChecksum()
