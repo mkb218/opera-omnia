@@ -1,6 +1,8 @@
 package main
 
+import "bytes"
 import "fmt"
+import "sort"
 import "math"
 import "net/http"
 import "log"
@@ -8,8 +10,6 @@ import "path"
 import "html/template"
 import "io"
 import "os/exec"
-import "sort"
-import "bytes"
 import "strconv"
 import "github.com/mkb218/egonest/src/echonest"
 
@@ -27,7 +27,7 @@ type SegSortSlice struct {
 }
 
 const TimbreWeight = 1
-const PitchWeight = 10
+const PitchWeight = 100
 const LoudStartWeight = 1
 const LoudMaxWeight = 1
 const DurationWeight = 1
@@ -80,9 +80,7 @@ func (s SegSortSlice) Len() int {
 }
 
 func (s SegSortSlice) Less(i, j int) bool {
-	idist := Distance(&s.slice[i], &s.root)
-	jdist := Distance(&s.slice[j], &s.root)
-	return idist < jdist
+	return s.slice[i].Distance < s.slice[j].Distance
 }
 
 func (s SegSortSlice) Swap(i, j int) {
@@ -95,13 +93,10 @@ type AudioRequest struct {
 	leftover []byte
 }
 
-var readcalls int
-
 func (a *AudioRequest) Read(b []byte) (n int, err error) {
-	readcalls++
-	if readcalls % 10 == 0 {
-		log.Println(readcalls, "readcalls", len(a.segments), "remaining segs")
-	}
+	// f, _ := os.OpenFile("cmds", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	// defer f.Close()
+
 	// if leftover is not empty, copy to b
 	if len(a.leftover) > 0 {
 		if len(a.leftover) > len(b) {
@@ -126,16 +121,23 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 		s := a.segments[0]
 		a.segments = a.segments[1:]
 		
-		var dbr float64
-		if s.LoudnessMax > 0 {
-			dbr = 10*math.Log10(s.RootLoudness/s.LoudnessMax)
-		}
-		sox := exec.Command(soxp, s.File, "-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", "-", "stretch", strconv.FormatFloat(s.RootDuration/s.Duration, 'g', -1, 64), "gain", strconv.FormatFloat(dbr, 'g', -1, 64))
-		sox.Stdout = new(bytes.Buffer)
+		args := []string{"-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", s.File,  "-b", "16", "-c", "2", "-e", "signed-integer", "-t", "raw", "-r", strconv.Itoa(samplerate), "-B", "-", "stretch", strconv.FormatFloat(s.RootDuration/s.Duration, 'g', -1, 64)}
+		rootavg := (s.RootLoudnessMax - s.RootLoudnessStart) / 2
+		avg := (s.RootLoudnessMax - s.RootLoudnessStart) / 2
+		if rootavg > avg {
+			args = append(args, "gain", fmt.Sprintf("%f", rootavg - avg))
+		} 
+		
+		sox := exec.Command(soxp, args...)
+		// fmt.Fprintln(f, "play", args)
+		ebuf := new(bytes.Buffer)
+		sox.Stderr = ebuf
 		var buf []byte
 		buf, err = sox.Output()
 		if err != nil {
-			log.Println("sox failed", err)
+			log.Println("sox failed", args, err)
+			log.Println(string(ebuf.Bytes()))
+			return
 		}
 		copy(b, buf)
 		if len(buf) > len(b) {
@@ -152,18 +154,18 @@ func (a *AudioRequest) Read(b []byte) (n int, err error) {
 	if len(a.segments) == 0 && len(a.leftover) == 0 {
 		err = io.EOF
 	}
-	log.Println("wrote", n, "bytes")
+	// log.Println("wrote", n, "bytes")
 	return
 }
 
 func RequestProc() {
-	log.Print("starting RequestProc")
+	log.Println("starting RequestProc")
 	e := echonest.New()
 	if echonestkey != "" {
 		e.Key = echonestkey
 	}
 	for r := range RequestQueue {
-		log.Print("got request for ID", r)
+		log.Println("got request for ID", r)
 		// see if we have analysis for this ID
 		s, ok := GetSegmentsForID(r)
 		if !ok {
@@ -181,14 +183,16 @@ func RequestProc() {
 		}
 
 		// once we get analysis, start grabbing samples
-		func() {
+		go func() {
 			var ar AudioRequest
-			allSegs.Lock()
-			defer allSegs.Unlock()
-			for _, segment := range s.segments {
+			allSegsLock.Lock()
+			defer allSegsLock.Unlock()
+			expectedlen := float64(0)
+			outlen := float64(0)
+			for _, segment := range s.Segments {
 				var ss SegSortSlice
-				m := make(map[SegmentID]bool)
-				var pitches = []int{12,12,12}
+//				m := make(map[SegmentID]bool)
+/*				var pitches = []int{12,12,12}
 				// find highest three pitches in segment
 				for note, p := range segment.Pitches[:] {
 					if pitches[0] == 12 || p > segment.Pitches[pitches[0]] {
@@ -201,45 +205,65 @@ func RequestProc() {
 				}
 
 				for index, n := range pitches {
-					if index == 0 {
-						for _, v := range allSegs.pitch[n].Segments[segment.Pitches[n] / allSegs.pitch[n].width] {
+					i := 0
+					for k := range m {
+						m[k] = false
+					}
+					
+					for _, v := range allSegs.Pitch[n].Segments[int(segment.Pitches[n] / allSegs.Pitch[n].Width)] {
+						if _, ok := m[v]; (index == 0) || ok {
+							i++
 							m[v] = true
 						}
-					} else {
-						for k := range m {
-							m[k] = false
-						}
-						
-						for _, v := range allSegs.pitch[n].Segments[segment.Pitches[n] / allSegs.pitch[n].width] {
-							if _, ok := m[v]; ok {
-								m[v] = true
-							}
-						}
 					}
-				}
+					if i <= 100 {
+						break
+					}
+				}*/
 				
-				ss.slice = make([]Segment, 0, len(m))
-				for k, b := range m {
-					if b {
-						ss.slice = append(ss.slice, allSegs.segments[k])
-					}
+				// ss.slice = make([]Segment, 0, len(m))
+				for k/*, b*/ := range allSegs.Segs {
+					// if b {
+						ss.slice = append(ss.slice, allSegs.Segs[k])
+						ss.slice[len(ss.slice)-1].Distance = Distance(&segment, &ss.slice[len(ss.slice)-1])
+//					}
 				}
 
 				ss.root = segment
 				sort.Sort(ss)
 				if len(ss.slice) > 0 {
-					outs := ss.slice[0]
-					outs.RootDuration = segment.Duration
-					outs.RootLoudness = segment.LoudnessMax
-					ar.segments = append(ar.segments, ss.slice[0])
+				var outs Segment = ss.slice[0]
+				// var mindist float64 = -1
+				// var distcount int
+				// for _, b := range allSegs.Segs {
+				// 	outs = b
+				// 	if mindist < 0 {
+				// 		mindist = Distance(&segment, &outs)
+				// 		log.Println("m", mindist)
+				// 	} else if distcount < 10 {
+				// 		if d := Distance(&segment, &outs); d < mindist {
+				// 			mindist = d
+				// 			distcount++
+				// 			log.Println(mindist)
+				// 		}
+				// 	} else {
+				// 		break
+				// 	}
+				// }
+				outs.RootDuration = segment.Duration
+				outs.RootLoudnessMax = segment.LoudnessMax
+				outs.RootLoudnessStart = segment.LoudnessStart
+				outlen += segment.Duration
+				ar.segments = append(ar.segments, outs)
 				}
+				expectedlen += segment.Duration
 			}
+			log.Println(expectedlen, outlen)
+			ar.artist = s.Artist
+			ar.title = s.Title
+			AudioQueue <- ar
 		} ()
-		ar.artist = s.artist
-		ar.title = s.title
 		
-		// write to audio queue
-		go func() { AudioQueue <- ar } ()
 	}
 }
 
@@ -254,7 +278,7 @@ func init() {
 }
 
 func RequestHandler(resp http.ResponseWriter, req *http.Request) {
-	log.Print("request id")
+	log.Println("request id")
 	t, fail := template.ParseFiles(path.Join(templateRoot, "request_fail.html"))
 	id := req.FormValue("id")
 	if len(id) == 0 {

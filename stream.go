@@ -5,6 +5,7 @@ package main
 // #include <stdlib.h>
 import "C"
 
+import "bytes"
 import "log"
 import "flag"
 import "os/exec"
@@ -53,7 +54,7 @@ func init() {
 }	
 
 func StreamProc() {
-	log.Print("starting StreamProc")
+	log.Println("starting StreamProc")
 	runtime.GOMAXPROCS(runtime.GOMAXPROCS(-1)+1)
 	runtime.LockOSThread()
 	C.shout_init()
@@ -62,14 +63,14 @@ func StreamProc() {
 	i := 0
 	{
 		if shout == nil {
-			log.Print("couldn't allocate shout_t")
+			log.Println("couldn't allocate shout_t")
 			goto LOOP
 		}
 		chost := C.CString(server)
 		defer C.free(unsafe.Pointer(chost))
 		if C.shout_set_host(shout, chost) != C.SHOUTERR_SUCCESS {
 			g := C.GoString(C.shout_get_error(shout))
-			log.Print("couldn't set host", g)
+			log.Println("couldn't set host", g)
 			goto LOOP
 		}
 		if C.shout_set_protocol(shout, C.SHOUT_PROTOCOL_ICY) != C.SHOUTERR_SUCCESS {
@@ -132,7 +133,7 @@ func StreamProc() {
 		if shout_ok {
 			r := C.shout_send(shout, (*C.uchar)(unsafe.Pointer(&f.data[0])), C.size_t(len(f.data)))
 			if r != C.SHOUTERR_SUCCESS {
-				log.Print("send error", C.GoString(C.shout_get_error(shout)))
+				log.Println("send error", C.GoString(C.shout_get_error(shout)))
 			}
 			sleeptime := C.shout_delay(shout)
 			time.Sleep(time.Duration(sleeptime) * time.Millisecond)
@@ -142,12 +143,12 @@ func StreamProc() {
 	
 	C.shout_close(shout) // what if there's an error? WHO CARES I'M DYING
 	C.shout_shutdown()
-	log.Print("StreamProc exiting")
+	log.Println("StreamProc exiting")
 	
 }
 
 func FileProc() {
-	log.Print("starting FileProc")
+	log.Println("starting FileProc")
 	for ar := range AudioQueue {
 		log.Println("from AudioQueue", ar.artist, ar.title)
 		f := File{ar.artist, ar.title, make([]byte,0)}
@@ -159,14 +160,12 @@ func FileProc() {
 		c := exec.Command(p, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", "-")
 		c.Stdin = &ar
 		c.Stdout = &f
-		err = c.Start()
+		b := new(bytes.Buffer)
+		c.Stderr = b
+		err = c.Run()
 		if err != nil {
-			log.Print("couldn't start lame ",ar.artist, ar.title, " :( ", err)
-			continue
-		}
-		err = c.Wait()
-		if err != nil {
-			log.Print("encoding failed for ",ar.artist, ar.title, " :( ", err)
+			log.Println("encoding failed for",ar.artist, ar.title, ":(", err)
+			log.Println(string(b.Bytes()))
 			continue
 		}
 		FileQueue <- f

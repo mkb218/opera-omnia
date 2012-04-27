@@ -12,7 +12,7 @@ var logfile *os.File
 func dumpStackTrace() {
 	size := runtime.Stack(stackbuf, true)
 	logfile.Write(stackbuf[0:size])
-	logfile.Write([]byte("-----------------------------"))
+	logfile.Write([]byte("-----------------------------\n"))
 }
 
 func monitor() {

@@ -30,7 +30,6 @@ func mapKey(in interface{}, k string) interface{} {
 	return nil
 }
 
-var tmpdir string
 var tmpLock sync.Mutex
 var tmpnamesize = base64.URLEncoding.EncodedLen(8)
 
@@ -45,7 +44,7 @@ func mktemp(prefix string) (*os.File, error) {
 		}
 		c := make([]byte, tmpnamesize)
 		base64.URLEncoding.Encode(c, b)
-		p := path.Join(tmpdir, string(c))
+		p := path.Join(os.TempDir(), string(c))
 		if f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666); err == nil {
 			return f, nil
 		} else {
@@ -66,38 +65,39 @@ type SegmentID struct {
 var bucketsize int
 var initialbucketwidth float64
 
-type bucket struct {
-	width float64
+type Bucket struct {
+	Width float64
 	Segments [][]SegmentID
 }
 
+var allSegsLock sync.Mutex
 var allSegs struct {
-	sync.Mutex
-	segs map[SegmentID]Segment
+	Segs map[SegmentID]Segment
 //	timbre [12]bucket
-	pitch [12]bucket
+	Pitch [12]Bucket
 }
 
 func initAllSegs() {
-	allSegs.Lock()
-	defer allSegs.Unlock()
+	allSegsLock.Lock()
+	defer allSegsLock.Unlock()
 	r, err := os.Open(path.Join(MapGobPath, "allsegs"))
 	if err != nil {
 		log.Println("error opening map gob file", err)
-		allSegs.segs = make(map[SegmentID]Segment)
+		allSegs.Segs = make(map[SegmentID]Segment)
 		for i := 0; i < 12; i++ {
 //			allSegs.timbre[i].width = initialbucketwidth
-			allSegs.pitch[i].width = initialbucketwidth
+			allSegs.Pitch[i].Width = initialbucketwidth
+			allSegs.Pitch[i].Segments = make([][]SegmentID, int(float64(1)/initialbucketwidth)+1)
 		}
+		return
 	}
 	defer r.Close()
 	g := gob.NewDecoder(r)
 	g.Decode(&allSegs)
+	log.Println("decoded", len(allSegs.Segs), "segments")
 }
 
 func balanceAllBuckets() {
-	allSegs.Lock()
-	defer allSegs.Unlock()
 	c := 0
 	for i := 0; i < 12; i++ {
 		// for j, r := range allSegs.timbre[i].Segments {
@@ -108,10 +108,10 @@ func balanceAllBuckets() {
 		// 	}
 		// }
 			
-		for j, r := range allSegs.pitch[i].Segments {
+		for _, r := range allSegs.Pitch[i].Segments {
 			if len(r) > bucketsize {
 				c++
-				balanceBuckets(&(allSegs.pitch[i]), "pitch", i)
+				balanceBuckets(&(allSegs.Pitch[i]), "pitch", i)
 				break
 			}
 		}
@@ -119,35 +119,35 @@ func balanceAllBuckets() {
 	log.Println("balanced",c,"buckets")
 }
 
-func balanceBuckets(b *bucket, field string, index int) {
-	b.width = b.width / 2
-	log.Println(field,i,"bucket width now",b.width)
+func balanceBuckets(b *Bucket, field string, index int) {
+	b.Width = b.Width / 2
+	log.Println(field,index,"bucket width now",b.Width)
 	olds := b.Segments
-	b.Segments = make([][]SegmentId, int(float64(1)/b.width))
+	b.Segments = make([][]SegmentID, int(float64(1)/b.Width)+1)
 	for _, ss := range olds {
 		for _, s := range ss {
 			var trg float64
 			if field == "timbre" {
-				trg = allSegs.segs[s].Timbre[i]
+				trg = allSegs.Segs[s].Timbre[index]
 			} else {
-				trg = allSegs.segs[s].Pitch[i]
+				trg = allSegs.Segs[s].Pitches[index]
 			}
-			trg /= b.width
+			trg /= b.Width
 			b.Segments[int(trg)] = append(b.Segments[int(trg)], s)
 		}
 	}
 }
 
 func AddToAllSegs(in []Segment) {
-	allSegs.Lock()
-	defer allSegs.Unlock()
+	allSegsLock.Lock()
+	defer allSegsLock.Unlock()
 	for _, r := range in {
-		allSegs.segs[r.SegmentID] = r
+		allSegs.Segs[r.SegmentID] = r
 		for i := 0; i < 12; i++ {
 			// bucketnum := int(r.Timbre[i] / allSegs.timbre[i].width)
 			// allSegs.timbre[i].Segments[bucketnum] = append(allSegs.timbre[i].Segments[bucketnum], r.SegmentID)
-			bucketnum = int(r.Pitch[i] / allSegs.pitch[i].width)
-			allSegs.pitch[i].Segments[bucketnum] = append(allSegs.pitch[i].Segments[bucketnum], r.SegmentID)
+			bucketnum := int(r.Pitches[i] / allSegs.Pitch[i].Width)
+			allSegs.Pitch[i].Segments[bucketnum] = append(allSegs.Pitch[i].Segments[bucketnum], r.SegmentID)
 		}
 	}
 	balanceAllBuckets()
@@ -159,7 +159,10 @@ func AddToAllSegs(in []Segment) {
 	}
 	defer w.Close()
 	g := gob.NewEncoder(w)
-	g.Encode(&allSegs)
+	err = g.Encode(&allSegs)
+	if err != nil {
+		log.Println("error writing gobfile for allsegs", err)
+	}
 }
 
 type UploadRequest struct {
@@ -176,23 +179,38 @@ func minOf(i, j int64) int64 {
 	return j
 }
 
+func fminOf(i, j float64) float64 {
+	if i < j {
+		return i
+	}
+	return j
+}
+
+func fmaxOf(i, j float64) float64 {
+	if i > j {
+		return i
+	}
+	return j
+}
+
 var UploadChan chan UploadRequest
 var MapGobPath string
 var samplepath string
 var echonestkey string
 
 type md5toid struct {
-	sync.Mutex
-	ids map[md5sum]string
+	Ids map[md5sum]string
 }
 
 type md5sum [16]byte
 
-var Md5toid md5toid = md5toid{ids:make(map[md5sum]string)}
+var Md5toidLock sync.Mutex
+
+var Md5toid md5toid = md5toid{Ids:make(map[md5sum]string)}
 
 func InitIDForChecksum() {
-	Md5toid.Lock()
-	defer Md5toid.Unlock()
+	Md5toidLock.Lock()
+	defer Md5toidLock.Unlock()
 	r, err := os.Open(path.Join(MapGobPath, "md5map"))
 	if err != nil {
 		log.Println("error opening map gob file", err)
@@ -201,19 +219,20 @@ func InitIDForChecksum() {
 	defer r.Close()
 	g := gob.NewDecoder(r)
 	g.Decode(&Md5toid)
+	log.Println("decoded", len(Md5toid.Ids), "md5s")
 }
 
 func GetIDForChecksum(m md5sum) (val string, ok bool) {
-	Md5toid.Lock()
-	defer Md5toid.Unlock()
-	val, ok = Md5toid.ids[m]
+	Md5toidLock.Lock()
+	defer Md5toidLock.Unlock()
+	val, ok = Md5toid.Ids[m]
 	return 
 }
 
 func AddIDForChecksum(m md5sum, id string) {
-	Md5toid.Lock()
-	defer Md5toid.Unlock()
-	Md5toid.ids[m] = id
+	Md5toidLock.Lock()
+	defer Md5toidLock.Unlock()
+	Md5toid.Ids[m] = id
 	// dump to gobfile
 	w, err := os.Create(path.Join(MapGobPath, "md5map"))
 	if err != nil {
@@ -222,7 +241,10 @@ func AddIDForChecksum(m md5sum, id string) {
 	}
 	defer w.Close()
 	g := gob.NewEncoder(w)
-	g.Encode(&Md5toid)
+	err = g.Encode(&Md5toid)
+	if err != nil {
+		log.Println("error writing gobfile for md5toid", err)
+	}
 }
 
 type Segment struct {
@@ -236,25 +258,28 @@ type Segment struct {
 	Pitches [12]float64
 	Timbre [12]float64
 	File string
-	RootLoudness float64
+	RootLoudnessMax float64
+	RootLoudnessStart float64
 	RootDuration float64
+	Distance float64
 }
 
 type Analysis struct {
-	artist, title string
-	segments []Segment
+	Artist, Title string
+	Segments []Segment
+	Last time.Time
 }
 
 type ID2AnalysisResults struct {
-	sync.Mutex
-	ids map[string]Analysis
+	Ids map[string]Analysis
 }
 
-var id2analysis = ID2AnalysisResults{ids:make(map[string]Analysis)}
+var id2analysisLock sync.Mutex
+var id2analysis = ID2AnalysisResults{Ids:make(map[string]Analysis)}
 
 func InitSegmentsForChecksum() {
-	id2analysis.Lock()
-	defer id2analysis.Unlock()
+	id2analysisLock.Lock()
+	defer id2analysisLock.Unlock()
 	r, err := os.Open(path.Join(MapGobPath, "idamap"))
 	if err != nil {
 		log.Println("error opening idamap gob file", err)
@@ -263,19 +288,24 @@ func InitSegmentsForChecksum() {
 	defer r.Close()
 	g := gob.NewDecoder(r)
 	g.Decode(&id2analysis)
+	log.Println("decoded", len(id2analysis.Ids), "ids")
 }
 
 func GetSegmentsForID(id string) (s Analysis, ok bool) {
-	id2analysis.Lock()
-	defer id2analysis.Unlock()
-	s, ok = id2analysis.ids[id]
+	id2analysisLock.Lock()
+	defer id2analysisLock.Unlock()
+	s, ok = id2analysis.Ids[id]
+	if time.Now().Sub(s.Last) > (30 * time.Day) {
+		delete(id2analysis.Ids,id)
+		return Analysis{}, nil
+	}
 	return
 }
 
 func SetSegmentsForID(id string, segments Analysis) {
-	id2analysis.Lock()
-	defer id2analysis.Unlock()
-	id2analysis.ids[id] = segments
+	id2analysisLock.Lock()
+	defer id2analysisLock.Unlock()
+	id2analysis.Ids[id] = segments
 	// write to gob
 	w, err := os.Create(path.Join(MapGobPath, "idamap"))
 	if err != nil {
@@ -284,14 +314,17 @@ func SetSegmentsForID(id string, segments Analysis) {
 	}
 	defer w.Close()
 	g := gob.NewEncoder(w)
-	g.Encode(&id2analysis)
+	err = g.Encode(&id2analysis)
+	if err != nil {
+		log.Println("error writing gobfile for idamap", err)
+	}
 }
 
 func DetailsForID(url, id string) (a Analysis, err error) {
 	log.Println("DetailsForID", id, url)
 	response, err := http.Get(url)
 	if err != nil {
-		log.Println("couldn't get details for ", id)
+		log.Println("couldn't get details for", id)
 		return Analysis{}, err
 	}
 	log.Println("got", response.ContentLength, "bytes")
@@ -304,14 +337,14 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 	title := mapKey(mapKey(details, "meta"), "title")
 	switch t := artist.(type) {
 	case string:
-		a.artist = t
+		a.Artist = t
 		log.Println("artist", artist)
 	default:
 		log.Println("no artist available")
 	}
 	switch t := title.(type) {
 	case string:
-		a.title = t
+		a.Title = t
 		log.Println("title", title)
 	default:
 		log.Println("no title available")
@@ -343,17 +376,17 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 		b1 = 0
 	}
 	
-	a.segments = make([]Segment, len(jsegments))
+	a.Segments = make([]Segment, len(jsegments))
 	SEG: for index, is := range jsegments {
 		s := is.(map[string]interface{})
-		a.segments[index].Id = id
-		a.segments[index].Index = index
-		a.segments[index].Start = s["start"].(float64)
-		a.segments[index].Duration = s["duration"].(float64)
-		a.segments[index].LoudnessStart = s["loudness_start"].(float64)
-		a.segments[index].LoudnessMax  = s["loudness_max"].(float64)
-		a.segments[index].Confidence  = s["confidence"].(float64)
-		if a.segments[index].Start > b1 {
+		a.Segments[index].Id = id
+		a.Segments[index].Index = index
+		a.Segments[index].Start = s["start"].(float64)
+		a.Segments[index].Duration = s["duration"].(float64)
+		a.Segments[index].LoudnessStart = s["loudness_start"].(float64)
+		a.Segments[index].LoudnessMax  = s["loudness_max"].(float64)
+		a.Segments[index].Confidence  = s["confidence"].(float64)
+		if a.Segments[index].Start > b1 {
 			b0 = b1
 			if len(jbeats) > 0 {
 				jb := jbeats[0]
@@ -364,7 +397,7 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 				}
 			}
 		}
-		a.segments[index].BeatDistance = a.segments[index].Start - b0
+		a.Segments[index].BeatDistance = a.Segments[index].Start - b0
 		p, ok := s["pitches"].([]interface{})
 		if !ok {
 			log.Println("no pitch info")
@@ -378,12 +411,12 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 		}
 		
 		for i := 0; i < 12; i++ {
-			a.segments[index].Pitches[i], ok = p[i].(float64)
+			a.Segments[index].Pitches[i], ok = p[i].(float64)
 			if !ok {
 				log.Println("can't coerce p element to float64")
 				continue SEG
 			}
-			a.segments[index].Timbre[i], ok = t[i].(float64)
+			a.Segments[index].Timbre[i], ok = t[i].(float64)
 			if !ok {
 				log.Println("can't coerce t element to float64")
 				continue SEG
@@ -391,12 +424,13 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 		}
 	}
 	log.Println("details OK")
+	a.Last = time.Now()
 	return a, nil
 }
 
 
 func UploadProc() {
-	log.Print("starting upload proc")
+	log.Println("starting upload proc")
 	// read md5 to ID mapping
 	// read ID to analysis mapping
 	
@@ -407,7 +441,7 @@ func UploadProc() {
 	}
 	
 	for r := range UploadChan {
-		log.Print("got ", len(r.Data), " bytes ",r.Filetype," add ",r.Add, " playback ", r.Playback)
+		log.Println("got", len(r.Data), "bytes",r.Filetype,"add",r.Add, "playback", r.Playback)
 		// md5 data and see if we have analysis already
 		var m md5sum
 		hasher.Write(r.Data)
@@ -444,43 +478,44 @@ func UploadProc() {
 			SetSegmentsForID(id, a)
 		}
 		
-		// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
-		if r.Add {
-			buf, err := openBuf(r.Data, r.Filetype)
-			if err != nil {
-				log.Println("couldn't get sox to run", err)
-				continue
-			}
-			// put raw samples into files
-			for i := range a.segments {
-				filename := id + "_" + strconv.Itoa(a.segments[i].Index)
-				filename = path.Join(samplepath, filename)
-				file, err := os.Create(filename)
+		go func() {
+			// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
+			if r.Add {
+				buf, err := openBuf(r.Data, r.Filetype)
 				if err != nil {
-					log.Println("couldn't open file", filename, err)
-					continue
+					log.Println("couldn't get sox to run", err)
+					return
 				}
-				bytecount := int(a.segments[i].Duration * float64(samplerate)) * 4 // 2 bytes per sample * 2 channels per frame
-				// log.Println(a.segments[i].Duration, bytecount)
-				_, err = file.Write(buf[:bytecount])
-				if err != nil {
-					log.Println("error writing sample", err)
-				}
-				file.Close()
-				a.segments[i].File = filename
+				// put raw samples into files
+				for i := range a.Segments {
+					filename := id + "_" + strconv.Itoa(a.Segments[i].Index)
+					filename = path.Join(samplepath, filename)
+					file, err := os.Create(filename)
+					if err != nil {
+						log.Println("couldn't open file", filename, err)
+						continue
+					}
+					bytecount := int(a.Segments[i].Duration * float64(samplerate)) * 4 // 2 bytes per sample * 2 channels per frame
+					// log.Println(a.segments[i].Duration, bytecount)
+					_, err = file.Write(buf[:bytecount])
+					if err != nil {
+						log.Println("error writing sample", err)
+					}
+					file.Close()
+					a.Segments[i].File = filename
 				
+				}
+				// add to all segments
+				log.Println("adding to all segs")
+				AddToAllSegs(a.Segments)
+				log.Println("done adding to all segs")
 			}
-			// add to all segments
-			log.Println("adding to all segs")
-			AddToAllSegs(a.segments)
-			log.Println("done adding to all segs")
-		}
 
-		// if request is marked "playback" add the ID to the request queue
-		if r.Playback {
-			go func() { RequestQueue <- id }()
-		}
-
+			// if request is marked "playback" add the ID to the request queue
+			if r.Playback {
+				RequestQueue <- id
+			}
+		}()
 	}
 }
 
@@ -542,12 +577,9 @@ func init() {
 	flag.StringVar(&MapGobPath, "mapgobpath", "/Users/mkb/code/opera-omnia/gobs", "")
 	flag.StringVar(&samplepath, "samples", "/Users/mkb/code/opera-omnia/samples", "")
 	flag.StringVar(&echonestkey, "echonestkey", "", "")
-	flag.StringVar(&tmpdir, "tmpdir", "/tmp", "")
 	flag.IntVar(&bucketsize, "bucketsize", 1000, "")
 	flag.Float64Var(&initialbucketwidth, "bucketwidth", 0.01, "")
 	
-	InitIDForChecksum()
-	InitSegmentsForChecksum()
 	UploadChan = make(chan UploadRequest)
 	gofuncs = append(gofuncs, UploadProc)
 	http.HandleFunc("/upload", UploadHandler)
@@ -557,14 +589,14 @@ func init() {
 func UploadHandler(resp http.ResponseWriter, req *http.Request) {
 	t, fail := template.ParseFiles(path.Join(templateRoot, "upload_fail.html"))
 	if fail != nil {
-		log.Print("couldn't load template " + fail.Error())
+		log.Println("couldn't load template " + fail.Error())
 	}
-	log.Print(req.Header)
-	log.Print("upload")
+	log.Println(req.Header)
+	log.Println("upload")
 	add := (req.FormValue("add") == "on")
 	playback := (req.FormValue("playback") == "on")
 	filetype := req.FormValue("filetype")
-	log.Print(add, playback, filetype)
+	log.Println(add, playback, filetype)
 	file, _, err := req.FormFile("filedata")
 	if !add && !playback {
 		if fail != nil {

@@ -20,11 +20,11 @@ func IndexHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 	p = path.Join(templateRoot, p)
 	if !strings.HasSuffix(p, ".html") {
-		log.Print("serving raw file", p)
+		log.Println("serving raw file", p)
 		http.ServeFile(resp, req, p)
 		return
 	}
-	log.Print("serving template", p)
+	log.Println("serving template", p)
 	t, err := template.ParseFiles(p)
 	if err != nil {
 		if os.IsNotExist(err) {

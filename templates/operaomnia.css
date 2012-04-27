@@ -1,0 +1,14 @@
+body {
+    font-family: sans-serif;
+    height: 400px;
+    margin-left: 15%;
+    margin-right: 15%;
+    text-align: justify;
+    margin-top: 15%;
+    margin-bottom: 15%
+}
+
+h1 { 
+    font-variant: small-caps;
+}
+
