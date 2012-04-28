@@ -43,15 +43,15 @@ func main() {
 			}
 		}
 	}
-	err := os.MkdirAll(MapGobsPath)
+	err := os.MkdirAll(MapGobPath, 0700)
 	if err != nil {
-		log.Fatalln("couldn't create gob path",MapGobsPath,err)
+		log.Fatalln("couldn't create gob path",MapGobPath,err)
 	}
-	err = os.MkDirAll(dumppath)
+	err = os.MkdirAll(dumppath, 0700)
 	if err != nil {
 		log.Fatalln("couldn't create",dumppath)
 	}
-	err = os.MkDirAll(samplepath)
+	err = os.MkdirAll(samplepath, 0700)
 	if err != nil {
 		log.Fatalln("couldn't create",dumppath)
 	}
@@ -59,7 +59,7 @@ func main() {
 	for _, g := range gofuncs {
 		go g()
 	}
-	err := http.ListenAndServe(address, nil)
+	err = http.ListenAndServe(address, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe:", err)
 	}

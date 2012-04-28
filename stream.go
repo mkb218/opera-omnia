@@ -23,6 +23,7 @@ var server string
 var port int
 var user string
 var password string
+var mount string
 var dumpraw bool
 var dumppath string
 
@@ -48,6 +49,7 @@ func init() {
 	flag.StringVar(&password, "password", "", "")
 	flag.BoolVar(&dumpraw, "dumpraw", true, "")
 	flag.StringVar(&dumppath, "dumppath", "/Users/mkb/code/opera-omnia/dump", "MUST EXIST")
+	flag.StringVar(&mount, "mount", "/", "")
 	FileQueue = make(chan File)
 	gofuncs = append(gofuncs, FileProc)
 	gofuncs = append(gofuncs, StreamProc)
@@ -66,6 +68,7 @@ func StreamProc() {
 			log.Println("couldn't allocate shout_t")
 			goto LOOP
 		}
+		
 		chost := C.CString(server)
 		defer C.free(unsafe.Pointer(chost))
 		if C.shout_set_host(shout, chost) != C.SHOUTERR_SUCCESS {
@@ -73,16 +76,17 @@ func StreamProc() {
 			log.Println("couldn't set host", g)
 			goto LOOP
 		}
+		if C.shout_set_port(shout, C.ushort(port)) != C.SHOUTERR_SUCCESS {
+			log.Printf("Error setting port: %s\n", C.GoString(C.shout_get_error(shout)));
+			goto LOOP
+		}
+
 		if C.shout_set_protocol(shout, C.SHOUT_PROTOCOL_ICY) != C.SHOUTERR_SUCCESS {
 			g := C.GoString(C.shout_get_error(shout))
 			log.Printf("Error setting protocol: %s\n", g);
 			goto LOOP
 		}
 
-		if C.shout_set_port(shout, C.ushort(port)) != C.SHOUTERR_SUCCESS {
-			log.Printf("Error setting port: %s\n", C.GoString(C.shout_get_error(shout)));
-			goto LOOP
-		}
 
 		cuser := C.CString(user)
 		defer C.free(unsafe.Pointer(cuser))

@@ -74,7 +74,7 @@ var allSegsLock sync.Mutex
 var allSegs struct {
 	Segs map[SegmentID]Segment
 //	timbre [12]bucket
-	Pitch [12]Bucket
+	// Pitch [12]Bucket
 }
 
 func initAllSegs() {
@@ -86,8 +86,8 @@ func initAllSegs() {
 		allSegs.Segs = make(map[SegmentID]Segment)
 		for i := 0; i < 12; i++ {
 //			allSegs.timbre[i].width = initialbucketwidth
-			allSegs.Pitch[i].Width = initialbucketwidth
-			allSegs.Pitch[i].Segments = make([][]SegmentID, int(float64(1)/initialbucketwidth)+1)
+//			allSegs.Pitch[i].Width = initialbucketwidth
+//			allSegs.Pitch[i].Segments = make([][]SegmentID, int(float64(1)/initialbucketwidth)+1)
 		}
 		return
 	}
@@ -95,47 +95,6 @@ func initAllSegs() {
 	g := gob.NewDecoder(r)
 	g.Decode(&allSegs)
 	log.Println("decoded", len(allSegs.Segs), "segments")
-}
-
-func balanceAllBuckets() {
-	c := 0
-	for i := 0; i < 12; i++ {
-		// for j, r := range allSegs.timbre[i].Segments {
-		// 	if len(r) > bucketsize {
-		// 		c++
-		// 		balanceBuckets(&(allSegs.timbre[i]), "timbre", i)
-		// 		break
-		// 	}
-		// }
-			
-		for _, r := range allSegs.Pitch[i].Segments {
-			if len(r) > bucketsize {
-				c++
-				balanceBuckets(&(allSegs.Pitch[i]), "pitch", i)
-				break
-			}
-		}
-	}
-	log.Println("balanced",c,"buckets")
-}
-
-func balanceBuckets(b *Bucket, field string, index int) {
-	b.Width = b.Width / 2
-	log.Println(field,index,"bucket width now",b.Width)
-	olds := b.Segments
-	b.Segments = make([][]SegmentID, int(float64(1)/b.Width)+1)
-	for _, ss := range olds {
-		for _, s := range ss {
-			var trg float64
-			if field == "timbre" {
-				trg = allSegs.Segs[s].Timbre[index]
-			} else {
-				trg = allSegs.Segs[s].Pitches[index]
-			}
-			trg /= b.Width
-			b.Segments[int(trg)] = append(b.Segments[int(trg)], s)
-		}
-	}
 }
 
 func AddToAllSegs(in []Segment) {
@@ -146,11 +105,11 @@ func AddToAllSegs(in []Segment) {
 		for i := 0; i < 12; i++ {
 			// bucketnum := int(r.Timbre[i] / allSegs.timbre[i].width)
 			// allSegs.timbre[i].Segments[bucketnum] = append(allSegs.timbre[i].Segments[bucketnum], r.SegmentID)
-			bucketnum := int(r.Pitches[i] / allSegs.Pitch[i].Width)
-			allSegs.Pitch[i].Segments[bucketnum] = append(allSegs.Pitch[i].Segments[bucketnum], r.SegmentID)
+//			bucketnum := int(r.Pitches[i] / allSegs.Pitch[i].Width)
+//			allSegs.Pitch[i].Segments[bucketnum] = append(allSegs.Pitch[i].Segments[bucketnum], r.SegmentID)
 		}
 	}
-	balanceAllBuckets()
+	// balanceAllBuckets()
 	// dump to gobfile
 	w, err := os.Create(path.Join(MapGobPath, "allsegs"))
 	if err != nil {
@@ -295,9 +254,10 @@ func GetSegmentsForID(id string) (s Analysis, ok bool) {
 	id2analysisLock.Lock()
 	defer id2analysisLock.Unlock()
 	s, ok = id2analysis.Ids[id]
-	if time.Now().Sub(s.Last) > (30 * time.Day) {
+	if (s.Last.UnixNano() > 0) && (time.Now().Sub(s.Last) > (30 * 24 * time.Hour)) {
+		log.Println("expired")
 		delete(id2analysis.Ids,id)
-		return Analysis{}, nil
+		return Analysis{}, false
 	}
 	return
 }

@@ -1,5 +1,7 @@
 package main
 
+import "sync"
+import "flag"
 import "time"
 import "runtime"
 import "log"
@@ -8,6 +10,9 @@ import "os/signal"
 
 var stackbuf []byte = make([]byte, 102400)
 var logfile *os.File
+var monitorlog string
+var rotatelock sync.Mutex
+var lastrotation time.Time
 
 func dumpStackTrace() {
 	size := runtime.Stack(stackbuf, true)
@@ -15,10 +20,39 @@ func dumpStackTrace() {
 	logfile.Write([]byte("-----------------------------\n"))
 }
 
+func rotate() *os.File {
+	rotatelock.Lock()
+	defer rotatelock.Unlock()
+	if logfile != nil {
+		logfile.Close()
+	}
+	
+	_, err := os.Stat(monitorlog)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			log.Panicln("couldn't stat monitor log", err)
+		} else {
+			goto OPEN
+		}
+	}
+	
+	err = os.Rename(monitorlog, monitorlog+".old")
+	if err != nil {
+		log.Fatalln("couldn't rotate monitorlog file", err)
+	}
+	
+	OPEN: f, err := os.Create(monitorlog)
+	if err != nil {
+		log.Fatalln("couldn't create monitorlog file", monitorlog, err)
+	}
+	return f
+}
+
 func monitor() {
+	logfile = rotate()
 	for {
-		time.Sleep(15*time.Second)
-		dumpStackTrace()
+		time.Sleep(15*time.Minute)
+		// don't know what to put here yet
 	}
 }
 
@@ -37,11 +71,7 @@ func signalHandler() {
 }
 
 func init() {
+	flag.StringVar(&monitorlog, "monitorlog", "log", "")
 	gofuncs = append(gofuncs, monitor)
 	// gofuncs = append(gofuncs, signalHandler)
-	var err error
-	logfile, err = os.Create("log")
-	if err != nil {
-		log.Panicln(err)
-	}
 }
