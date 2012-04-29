@@ -106,10 +106,20 @@ func StreamProc() {
 			log.Printf("Error setting user: %s\n", C.GoString(C.shout_get_error(shout)));
 			goto LOOP
 		}
+		
+		cmount := C.CString(mount)
+		defer C.free(unsafe.Pointer(cmount))
+		if C.shout_set_mount(shout, cmount) != C.SHOUTERR_SUCCESS {
+			log.Printf("Error setting mount point: %s\n", C.GoString(C.shout_get_error(shout)));
+			goto LOOP
+		}
+			
+		if.C.shout_set_audio_info(shout, SHOUT_AI_BITRATE, bitrate)
 
 		// connect to server
-		if C.shout_open(shout) != C.SHOUTERR_SUCCESS {
-			log.Printf("Couldn't open streaming server: %s", C.GoString(C.shout_get_error(shout)))
+		e := C.shout_open(shout)
+		if e != C.SHOUTERR_SUCCESS {
+			log.Printf("Couldn't open streaming server: %d %s\n", e, C.GoString(C.shout_get_error(shout)))
 			goto LOOP
 		}
 		shout_ok = true
@@ -146,6 +156,7 @@ func StreamProc() {
 	}
 	
 	C.shout_close(shout) // what if there's an error? WHO CARES I'M DYING
+	C.shout_free(shout) // what if there's an error? WHO CARES I'M DYING
 	C.shout_shutdown()
 	log.Println("StreamProc exiting")
 	
