@@ -1,0 +1,24 @@
+<html>
+	<head><title>Opera Omnia - Listen</title>
+		
+		<script type="text/javascript">
+
+		  var _gaq = _gaq || [];
+		  _gaq.push(['_setAccount', 'UA-1899245-7']);
+		  _gaq.push(['_trackPageview']);
+
+		  (function() {
+		    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+		    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+		    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+		  })();
+
+		</script>
+	</head>
+	<body>
+		<h1>Listen here!</h1>
+		<p><ul>
+		{{range $index, $element := .}}<li><a href="listen?file={{$index}}">{{$index}}</a>{{end}}
+		<h6>&copy; Matt Kane 2012. A product of <a href="http://rethink.musichackathon.org/">the Rethink Music Hackers' Weekend</a>. <a href="http://github.com/mkb218/opera-omnia">github</a>. <a href="http://twitter.com/nynexrepublic">@nynexrepublic</a>. <a href="http://nynex.hydrogenproject.com">blog</a>. <a href="https://www.facebook.com/RepublicOfNynex">Facebook</a>.</h6>
+	</body>
+</html>
