@@ -96,7 +96,7 @@ func FileProc() {
 			continue
 		}
 		log.Println("dumpchan send")
-		dumpchan <- path.Base(p)
+		dumpchan <- path.Base(f)
 		log.Println("dumpchan sent")
 	}
 }
