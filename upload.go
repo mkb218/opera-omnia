@@ -441,7 +441,7 @@ func UploadProc() {
 		
 		go func() {
 			// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
-			has := (a[0].File != "")
+			has := (a.Segments[0].File != "")
 			if r.Add && !has {
 				buf, err := openBuf(r.Data, r.Filetype)
 				if err != nil {
