@@ -1,18 +1,12 @@
 package main
 
-// #cgo LDFLAGS: -lshout
-// #include <shout/shout.h>
-// #include <stdlib.h>
-import "C"
-
 import "bytes"
 import "log"
 import "flag"
 import "os/exec"
 import "strconv"
 import "runtime"
-import "unsafe"
-import "time"
+import "syscall"
 import "os"
 import "path"
 import "strings"
@@ -24,7 +18,6 @@ var port int
 var user string
 var password string
 var mount string
-var dumpraw bool
 var dumppath string
 
 // compressed
@@ -47,117 +40,80 @@ func init() {
 	flag.IntVar(&port, "port", 8000, "")
 	flag.StringVar(&user, "user", "", "")
 	flag.StringVar(&password, "password", "", "")
-	flag.BoolVar(&dumpraw, "dumpraw", true, "")
 	flag.StringVar(&dumppath, "dumppath", "/Users/mkb/code/opera-omnia/dump", "MUST EXIST")
-	flag.StringVar(&mount, "mount", "/", "")
-	FileQueue = make(chan File)
+	flag.StringVar(&mount, "mount", "/opera-omnia", "")
+	FileQueue = make(chan File, 10)
 	gofuncs = append(gofuncs, FileProc)
 	gofuncs = append(gofuncs, StreamProc)
 }	
+
+func PlaylistProc(c chan string) {
+	fifo, err := os.OpenFile("ices.pipe", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatalln("couldn't open fifo!", err)
+	}
+	for {
+		p := <-c
+		fifo.Write([]byte(p))
+		fifo.Write([]byte{'\n'})
+	}
+}
+
 
 func StreamProc() {
 	log.Println("starting StreamProc")
 	runtime.GOMAXPROCS(runtime.GOMAXPROCS(-1)+1)
 	runtime.LockOSThread()
-	C.shout_init()
-	shout_ok := false
-	shout := C.shout_new()
-	i := 0
-	{
-		if shout == nil {
-			log.Println("couldn't allocate shout_t")
-			goto LOOP
-		}
-		
-		chost := C.CString(server)
-		defer C.free(unsafe.Pointer(chost))
-		if C.shout_set_host(shout, chost) != C.SHOUTERR_SUCCESS {
-			g := C.GoString(C.shout_get_error(shout))
-			log.Println("couldn't set host", g)
-			goto LOOP
-		}
-		if C.shout_set_port(shout, C.ushort(port)) != C.SHOUTERR_SUCCESS {
-			log.Printf("Error setting port: %s\n", C.GoString(C.shout_get_error(shout)));
-			goto LOOP
-		}
-
-		if C.shout_set_protocol(shout, C.SHOUT_PROTOCOL_ICY) != C.SHOUTERR_SUCCESS {
-			g := C.GoString(C.shout_get_error(shout))
-			log.Printf("Error setting protocol: %s\n", g);
-			goto LOOP
-		}
-
-
-		cuser := C.CString(user)
-		defer C.free(unsafe.Pointer(cuser))
-		if C.shout_set_user(shout, cuser) != C.SHOUTERR_SUCCESS {
-			log.Printf("Error setting user: %s\n", C.GoString(C.shout_get_error(shout)));
-			goto LOOP
-		}
-
-		cpassword := C.CString(password)
-		defer C.free(unsafe.Pointer(cpassword))
-		if C.shout_set_password(shout, cpassword) != C.SHOUTERR_SUCCESS {
-			log.Printf("Error setting password: %s\n", C.GoString(C.shout_get_error(shout)));
-			goto LOOP
-		}
-
-		if C.shout_set_format(shout, C.SHOUT_FORMAT_MP3) != C.SHOUTERR_SUCCESS {
-			log.Printf("Error setting user: %s\n", C.GoString(C.shout_get_error(shout)));
-			goto LOOP
-		}
-		
-		cmount := C.CString(mount)
-		defer C.free(unsafe.Pointer(cmount))
-		if C.shout_set_mount(shout, cmount) != C.SHOUTERR_SUCCESS {
-			log.Printf("Error setting mount point: %s\n", C.GoString(C.shout_get_error(shout)));
-			goto LOOP
-		}
-			
-		if.C.shout_set_audio_info(shout, SHOUT_AI_BITRATE, bitrate)
-
-		// connect to server
-		e := C.shout_open(shout)
-		if e != C.SHOUTERR_SUCCESS {
-			log.Printf("Couldn't open streaming server: %d %s\n", e, C.GoString(C.shout_get_error(shout)))
-			goto LOOP
-		}
-		shout_ok = true
+	// mkfifo
+	playlistc := make(chan string)
+	go PlaylistProc(playlistc)
+	icesp, err := exec.LookPath("ices0")
+	if err != nil {
+		log.Fatalln("couldn't find ices!", err)
 	}
-		
-	LOOP: for f := range FileQueue {
-		if dumpraw {
-			go func() {
-				p := f.artist + "-" + f.title + strconv.Itoa(i) + ".mp3"
-				i++
-				p = path.Join(dumppath, strings.Replace(p, "/", "_", -1))
-				file, err := os.Create(p)
-				if err != nil {
-					log.Println("creating raw dump file failed :(", err)
-					return
-				}
-				defer file.Close()
-				n, err := file.Write(f.data)
-				if err != nil {
-					log.Println("writing file failed!", err)
-				} 
-				log.Println("wrote",n,"bytes")
-			}()
+	iceargs := []string{"-h", server, "-p", strconv.Itoa(port), "-P", password, "-m", mount, "-S", "perl", "-n", "Opera Omnia", "-u", "http://opera-omnia.hydrogenproject.com"}
+	ices := exec.Command(icesp, iceargs...)
+	ices.Stdout = os.Stdout
+	ices.Stderr = os.Stderr
+	i := 0
+	log.Println("FileQueue loop starts")
+	for f := range FileQueue {
+		log.Println("FileQueue")
+		p := f.artist + "-" + f.title + strconv.Itoa(i) + ".mp3"
+		p = path.Join(dumppath, strings.Replace(p, "/", "_", -1))
+		file, err := os.Create(p)
+		if err != nil {
+			log.Println("creating raw dump file failed :(", err)
+			return
 		}
-		if shout_ok {
-			r := C.shout_send(shout, (*C.uchar)(unsafe.Pointer(&f.data[0])), C.size_t(len(f.data)))
-			if r != C.SHOUTERR_SUCCESS {
-				log.Println("send error", C.GoString(C.shout_get_error(shout)))
+		defer file.Close()
+		n, err := file.Write(f.data)
+		if err != nil {
+			log.Println("writing file failed!", err)
+		} 
+		log.Println("wrote",n,"bytes to dump file")
+		file.Close()
+		if ices.ProcessState == nil || ices.ProcessState.Exited() {
+			if ices.ProcessState != nil {
+				ices.Wait()
+				ws := ices.ProcessState.Sys().(syscall.WaitStatus)
+				log.Println("ices exited with status", ws.ExitStatus())
+				// log.Println("stdout", string(ices.Stdout.(*bytes.Buffer).Bytes()))
+				// log.Println("stderr", string(ices.Stdout.(*bytes.Buffer).Bytes()))
+				// ices.Stdout = new(bytes.Buffer)
+				// ices.Stderr = new(bytes.Buffer)
+				ices = exec.Command(icesp, iceargs...)
 			}
-			sleeptime := C.shout_delay(shout)
-			time.Sleep(time.Duration(sleeptime) * time.Millisecond)
+			err := ices.Start()
+			if err != nil {
+				log.Fatalln("couldn't start ices", err)
+			}
+			log.Println("started ices")
 		}
+		playlistc <- p
 		i++
 	}
 	
-	C.shout_close(shout) // what if there's an error? WHO CARES I'M DYING
-	C.shout_free(shout) // what if there's an error? WHO CARES I'M DYING
-	C.shout_shutdown()
 	log.Println("StreamProc exiting")
 	
 }
@@ -172,7 +128,7 @@ func FileProc() {
 			log.Panic("no lame found! CAN'T STREAM. DYING.")
 		}
 		
-		c := exec.Command(p, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", "-")
+		c := exec.Command(p, "--tt", ar.title + " mangled by Opera Omnia", "--ta", ar.artist, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", "-")
 		c.Stdin = &ar
 		c.Stdout = &f
 		b := new(bytes.Buffer)
@@ -183,7 +139,9 @@ func FileProc() {
 			log.Println(string(b.Bytes()))
 			continue
 		}
+		log.Println("sending to filequeue")
 		FileQueue <- f
+		log.Println("sent to filequeue")
 	}
 }
 

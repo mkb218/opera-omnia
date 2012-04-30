@@ -15,6 +15,8 @@ var rotatelock sync.Mutex
 var lastrotation time.Time
 
 func dumpStackTrace() {
+	rotatelock.Lock()
+	defer rotatelock.Unlock()
 	size := runtime.Stack(stackbuf, true)
 	logfile.Write(stackbuf[0:size])
 	logfile.Write([]byte("-----------------------------\n"))
@@ -52,7 +54,7 @@ func monitor() {
 	logfile = rotate()
 	for {
 		time.Sleep(15*time.Minute)
-		// don't know what to put here yet
+		dumpStackTrace()
 	}
 }
 
@@ -73,5 +75,5 @@ func signalHandler() {
 func init() {
 	flag.StringVar(&monitorlog, "monitorlog", "log", "")
 	gofuncs = append(gofuncs, monitor)
-	// gofuncs = append(gofuncs, signalHandler)
+	gofuncs = append(gofuncs, signalHandler)
 }
