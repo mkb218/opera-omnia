@@ -1,5 +1,6 @@
 package main
 
+import "runtime"
 import "flag"
 import "log"
 import "log/syslog"
@@ -20,7 +21,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-
+	runtime.GOMAXPROCS(runtime.NumCPU()+1)
 	InitIDForChecksum()
 	InitSegmentsForChecksum()
 	initAllSegs()

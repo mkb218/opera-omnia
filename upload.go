@@ -540,7 +540,7 @@ func init() {
 	flag.IntVar(&bucketsize, "bucketsize", 1000, "")
 	flag.Float64Var(&initialbucketwidth, "bucketwidth", 0.01, "")
 	
-	UploadChan = make(chan UploadRequest)
+	UploadChan = make(chan UploadRequest,1)
 	gofuncs = append(gofuncs, UploadProc)
 	http.HandleFunc("/upload", UploadHandler)
 	rander = rand.New(rand.NewSource(time.Now().UnixNano()))

@@ -271,8 +271,8 @@ var allSegments []Segment
 
 
 func init() {
-	RequestQueue = make(chan string)
-	AudioQueue = make(chan AudioRequest)
+	RequestQueue = make(chan string,1)
+	AudioQueue = make(chan AudioRequest,1)
 	gofuncs = append(gofuncs, RequestProc)
 	http.HandleFunc("/request", RequestHandler)
 }

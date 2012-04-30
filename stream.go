@@ -5,8 +5,6 @@ import "log"
 import "flag"
 import "os/exec"
 import "strconv"
-import "runtime"
-import "syscall"
 import "os"
 import "path"
 import "strings"
@@ -36,50 +34,21 @@ var FileQueue chan File
 func init() {
 	flag.IntVar(&bitrate, "bitrate", 64, "kbps")
 	flag.IntVar(&samplerate, "samplerate", 44100, "")
-	flag.StringVar(&server, "server", "localhost", "")
-	flag.IntVar(&port, "port", 8000, "")
-	flag.StringVar(&user, "user", "", "")
-	flag.StringVar(&password, "password", "", "")
 	flag.StringVar(&dumppath, "dumppath", "/Users/mkb/code/opera-omnia/dump", "MUST EXIST")
-	flag.StringVar(&mount, "mount", "/opera-omnia", "")
 	FileQueue = make(chan File, 10)
 	gofuncs = append(gofuncs, FileProc)
 	gofuncs = append(gofuncs, StreamProc)
 }	
 
-func PlaylistProc(c chan string) {
-	fifo, err := os.OpenFile("ices.pipe", os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
-	if err != nil {
-		log.Fatalln("couldn't open fifo!", err)
-	}
-	for {
-		p := <-c
-		fifo.Write([]byte(p))
-		fifo.Write([]byte{'\n'})
-	}
-}
-
-
 func StreamProc() {
 	log.Println("starting StreamProc")
-	runtime.GOMAXPROCS(runtime.GOMAXPROCS(-1)+1)
-	runtime.LockOSThread()
-	// mkfifo
-	playlistc := make(chan string)
-	go PlaylistProc(playlistc)
-	icesp, err := exec.LookPath("ices0")
-	if err != nil {
-		log.Fatalln("couldn't find ices!", err)
-	}
-	iceargs := []string{"-h", server, "-p", strconv.Itoa(port), "-P", password, "-m", mount, "-S", "perl", "-n", "Opera Omnia", "-u", "http://opera-omnia.hydrogenproject.com"}
-	ices := exec.Command(icesp, iceargs...)
-	ices.Stdout = os.Stdout
-	ices.Stderr = os.Stderr
-	i := 0
 	log.Println("FileQueue loop starts")
 	for f := range FileQueue {
 		log.Println("FileQueue")
-		p := f.artist + "-" + f.title + strconv.Itoa(i) + ".mp3"
+		listenlock.RLock()
+		p := f.artist + "-" + f.title + strconv.Itoa(listen.Count) + ".mp3"
+		listen.Count++
+		listenlock.RUnlock()
 		p = path.Join(dumppath, strings.Replace(p, "/", "_", -1))
 		file, err := os.Create(p)
 		if err != nil {
@@ -93,25 +62,9 @@ func StreamProc() {
 		} 
 		log.Println("wrote",n,"bytes to dump file")
 		file.Close()
-		if ices.ProcessState == nil || ices.ProcessState.Exited() {
-			if ices.ProcessState != nil {
-				ices.Wait()
-				ws := ices.ProcessState.Sys().(syscall.WaitStatus)
-				log.Println("ices exited with status", ws.ExitStatus())
-				// log.Println("stdout", string(ices.Stdout.(*bytes.Buffer).Bytes()))
-				// log.Println("stderr", string(ices.Stdout.(*bytes.Buffer).Bytes()))
-				// ices.Stdout = new(bytes.Buffer)
-				// ices.Stderr = new(bytes.Buffer)
-				ices = exec.Command(icesp, iceargs...)
-			}
-			err := ices.Start()
-			if err != nil {
-				log.Fatalln("couldn't start ices", err)
-			}
-			log.Println("started ices")
-		}
-		playlistc <- p
-		i++
+		log.Println("dumpchan send")
+		dumpchan <- path.Base(p)
+		log.Println("dumpchan sent")
 	}
 	
 	log.Println("StreamProc exiting")
