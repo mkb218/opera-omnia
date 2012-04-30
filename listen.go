@@ -17,6 +17,7 @@ var listenlock sync.RWMutex
 
 func ListenProc() {
 	listenlock.Lock()
+	log.Println("ListenProc starting in lock")
 	g, err := os.Open(path.Join(MapGobPath, "listen"))
 	if err == nil {
 		gd := gob.NewDecoder(g)
@@ -34,26 +35,41 @@ func ListenProc() {
 		log.Println("couldn't load listen stats", err)
 	}
 	listenlock.Unlock()
+	log.Println("unlocked write lock ListenProc")
 	listenlock.RLock()
+	log.Println("locked read lock ListenProc")
 	d, err := os.OpenFile(dumppath, os.O_RDONLY, 0600)
 	if err != nil {
 		log.Fatalln("dumppath should have been created by now", err)
 	}
+	found := make(map[string]bool)
 	names, err := d.Readdirnames(-1)
 	if err != nil {
 		log.Println("couldn't read all names from dumppath", err)
 	}
 	for _, name := range names {
 		fullname := path.Join(dumppath, name)
-		if !listen.M[fullname] {
+		if !listen.M[name] {
 			err = os.Remove(fullname)
 			if err != nil {
 				log.Println("couldn't remove", fullname, err)
 			}
+		} else {
+			log.Println("found dump file",name)
+			found[name] = true
 		}
 	}
 	d.Close()
+	for n := range listen.M {
+		if !found[n] {
+			log.Println("no file for",n,"deleting from map")
+			delete(listen.M, n)
+		} else {
+			log.Println("found file for",n)
+		}
+	}
 	listenlock.RUnlock()
+	log.Println("unlocked read lock ListenProc")
 	for d := range dumpchan {
 		log.Println("recvd", d)
 		listenlock.Lock()
@@ -70,11 +86,14 @@ func ListenProc() {
 			log.Println("couldn't write listen stats", err)
 		}
 		listenlock.Unlock()
+		log.Println("done with write lock ListenProc")
 	}
 }
 
 func ListenHandler(resp http.ResponseWriter, req *http.Request) {
+	log.Println("ListenHandler waiting")
 	listenlock.RLock()
+	log.Println("ListenHandler", *req)
 	defer listenlock.RUnlock()
 	// if no arg, serve template with listen
 	f := req.FormValue("file")
@@ -86,15 +105,20 @@ func ListenHandler(resp http.ResponseWriter, req *http.Request) {
 			} else {
 				http.Error(resp, err.Error(), 500)
 			}
+			log.Println("template error", err)
 			return
 		}
+		log.Println("listen template")
 		err = t.Execute(resp, listen.M)
 		if err != nil {
 			http.Error(resp, err.Error(), 500)
+			log.Println("listen template error", err)
 		}
 	} else if listen.M[f] {
+		log.Println("serving file", f)
 		http.ServeFile(resp, req, path.Join(dumppath, path.Base(f)))
 	} else {
+		log.Println("no file")
 		http.Error(resp, "File's not ready!", 404)
 	}
 }
