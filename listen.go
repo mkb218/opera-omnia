@@ -52,6 +52,8 @@ func ListenProc() {
 			}
 		}
 	}
+	d.Close()
+	listenlock.RUnlock()
 	for d := range dumpchan {
 		log.Println("recvd", d)
 		listenlock.Lock()
