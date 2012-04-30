@@ -66,7 +66,7 @@ func signalHandler() {
 		dumpStackTrace()
 		close(RequestQueue)
 		close(AudioQueue)
-		close(FileQueue)
+		// close(FileQueue)
 		close(UploadChan)
 		os.Exit(2)
 	}
