@@ -100,6 +100,7 @@ func initAllSegs() {
 func AddToAllSegs(in []Segment) {
 	allSegsLock.Lock()
 	defer allSegsLock.Unlock()
+	
 	for _, r := range in {
 		allSegs.Segs[r.SegmentID] = r
 		for i := 0; i < 12; i++ {
@@ -440,7 +441,8 @@ func UploadProc() {
 		
 		go func() {
 			// if it's marked "add" open data with sox sub process (for mp3, mp4, and m4a support) to get raw samples
-			if r.Add {
+			has := (a[0].File != "")
+			if r.Add && !has {
 				buf, err := openBuf(r.Data, r.Filetype)
 				if err != nil {
 					log.Println("couldn't get sox to run", err)
