@@ -27,6 +27,7 @@ type SegSortSlice struct {
 	slice []Segment
 }
 
+const Loudness_min = -20
 const TimbreWeight = 14
 const PitchWeight = 10
 const LoudStartWeight = 1
@@ -229,10 +230,10 @@ func RequestProc() {
 				
 				// ss.slice = make([]Segment, 0, len(m))
 				for k/*, b*/ := range allSegs.Segs {
-					// if b {
+					if allSegs.Segs[k].LoudnessMax > Loudness_min {
 						ss.slice = append(ss.slice, allSegs.Segs[k])
 						ss.slice[len(ss.slice)-1].Distance = Distance(&segment, &ss.slice[len(ss.slice)-1])
-//					}
+					}
 				}
 
 				ss.root = segment
