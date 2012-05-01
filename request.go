@@ -196,6 +196,7 @@ func RequestProc() {
 			defer allSegsLock.Unlock()
 			expectedlen := float64(0)
 			outlen := float64(0)
+			var totdist float64
 			for _, segment := range s.Segments {
 				var ss SegSortSlice
 //				m := make(map[SegmentID]bool)
@@ -238,7 +239,6 @@ func RequestProc() {
 
 				ss.root = segment
 				sort.Sort(ss)
-				var totdist float64
 				if len(ss.slice) > 0 {
 					var outs Segment = ss.slice[0]
 					totdist += ss.slice[0].Distance
