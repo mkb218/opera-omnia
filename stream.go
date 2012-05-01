@@ -79,7 +79,7 @@ func FileProc() {
 		}
 		
 		f := ar.artist + "-" + ar.title + strconv.Itoa(listen.Count) + ".mp3"
-		f = path.Join(dumppath, strings.Replace(p, "/", "_", -1))
+		f = path.Join(dumppath, strings.Replace(f, "/", "_", -1))
 		listen.Count++
 		listenlock.RUnlock()
 		c := exec.Command(p, "--tt", ar.title + " mangled by Opera Omnia", "--ta", ar.artist, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", f)
