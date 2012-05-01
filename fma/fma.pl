@@ -13,7 +13,9 @@ dbmopen(%ids,"ids",0666);
 
 my $apikey = $ARGV[0];
 
-my $baseurl = "http://freemusicarchive.org/api/get/tracks.json?sort_by=track_date_created&limit=1&sort_dir=desc&page=%s&api_key=$apikey";
+my @sorts = qw(track_id track_title track_date_recorded track_listens track_favorites track_date_created);
+my $sort = $sorts[int(rand(@sorts))];
+my $baseurl = "http://freemusicarchive.org/api/get/tracks.json?sort_by=$sort&limit=1&sort_dir=desc&page=%s&api_key=$apikey";
 
 my $page = 1;
 while (1) {
