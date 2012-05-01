@@ -77,12 +77,13 @@ func FileProc() {
 		if err != nil {
 			log.Panic("no lame found! CAN'T STREAM. DYING.")
 		}
-		func() {
+		f := func() string {
 			listenlock.Lock()
 			defer listenlock.Unlock()
 			f := ar.artist + "-" + ar.title + strconv.Itoa(listen.Count) + ".mp3"
 			f = path.Join(dumppath, strings.Replace(f, "/", "_", -1))
 			listen.Count++
+			return f
 		}()
 		
 		c := exec.Command(p, "--tt", ar.title + " mangled by Opera Omnia", "--ta", ar.artist, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", f)
