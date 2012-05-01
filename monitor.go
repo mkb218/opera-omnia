@@ -54,11 +54,13 @@ func rotate() *os.File {
 func monitor() {
 	logfile = rotate()
 	for {
-		time.Sleep(15*time.Minute)
+		fmt.Fprintln(logfile, time.Now())
 		fmt.Fprintf(logfile, "dumpchan %d\n", len(dumpchan))
 		fmt.Fprintf(logfile, "RequestQueue %d\n", len(RequestQueue))
 		fmt.Fprintf(logfile, "AudioQueue %d\n", len(AudioQueue))
 		fmt.Fprintf(logfile, "UploadChan %d\n", len(UploadChan))
+		fmt.Fprintln("----")
+		time.Sleep(5*time.Minute)
 	}
 }
 
