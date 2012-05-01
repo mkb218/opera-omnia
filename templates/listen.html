@@ -17,8 +17,12 @@
 	</head>
 	<body>
 		<h1>Listen here!</h1>
-		<p><ul>
-		{{range $index, $element := .}}<li><a href="listen?file={{$index}}">{{$index}}</a>{{end}}
+		<p>Available:<ul>
+		{{range $index, $element := .Avail}}<li><a href="listen?file={{$index}}">{{$index}}</a></li>{{end}}
+		</ul></p>
+		<p>In Queue:<ul>
+		{{range $index, $element := .Queue}}<li>{{$index.Artist}} - {{$index.Title}}</li>{{end}}
+		</ul></p>
 		<h6>&copy; Matt Kane 2012. A product of <a href="http://rethink.musichackathon.org/">the Rethink Music Hackers' Weekend</a>. <a href="http://github.com/mkb218/opera-omnia">github</a>. <a href="http://twitter.com/nynexrepublic">@nynexrepublic</a>. <a href="http://nynex.hydrogenproject.com">blog</a>. <a href="https://www.facebook.com/RepublicOfNynex">Facebook</a>.</h6>
 	</body>
 </html>

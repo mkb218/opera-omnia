@@ -90,11 +90,17 @@ func ListenProc() {
 	}
 }
 
+type listendata struct {
+	Avail map[string]bool
+	Queue map[playq]bool
+}
+
 func ListenHandler(resp http.ResponseWriter, req *http.Request) {
 	log.Println("ListenHandler waiting")
 	listenlock.RLock()
-	log.Println("ListenHandler", *req)
 	defer listenlock.RUnlock()
+	log.Println("ListenHandler", *req)
+	
 	// if no arg, serve template with listen
 	f := req.FormValue("file")
 	if f == "" {
@@ -109,7 +115,9 @@ func ListenHandler(resp http.ResponseWriter, req *http.Request) {
 			return
 		}
 		log.Println("listen template")
-		err = t.Execute(resp, listen.M)
+		playqlock.RLock()
+		defer playqlock.RUnlock()
+		err = t.Execute(resp, listendata{listen.M, playqueue})
 		if err != nil {
 			http.Error(resp, err.Error(), 500)
 			log.Println("listen template error", err)

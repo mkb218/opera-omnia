@@ -78,12 +78,12 @@ func FileProc() {
 			log.Panic("no lame found! CAN'T STREAM. DYING.")
 		}
 		
+		listenlock.Lock()
 		f := ar.artist + "-" + ar.title + strconv.Itoa(listen.Count) + ".mp3"
 		f = path.Join(dumppath, strings.Replace(f, "/", "_", -1))
 		listen.Count++
-		listenlock.RUnlock()
+		listenlock.Unlock()
 		c := exec.Command(p, "--tt", ar.title + " mangled by Opera Omnia", "--ta", ar.artist, "-r", "--bitwidth", "16", "--big-endian", "-b", strconv.Itoa(bitrate), "--cbr", "--nohist", "--signed", "-s", "44.1", "-", f)
-		listenlock.RLock()
 		c.Stdin = &ar
 		c.Stdout = new(bytes.Buffer)
 		b := new(bytes.Buffer)
@@ -96,6 +96,9 @@ func FileProc() {
 			continue
 		}
 		log.Println("dumpchan send")
+		playqlock.Lock()
+		delete(playqueue, playq{ar.artist, ar.title})
+		playqlock.Unlock()
 		dumpchan <- path.Base(f)
 		log.Println("dumpchan sent")
 	}

@@ -1,5 +1,6 @@
 package main
 
+import "sync"
 import "bytes"
 import "fmt"
 import "sort"
@@ -26,12 +27,12 @@ type SegSortSlice struct {
 	slice []Segment
 }
 
-const TimbreWeight = 1
-const PitchWeight = 100
+const TimbreWeight = 14
+const PitchWeight = 10
 const LoudStartWeight = 1
 const LoudMaxWeight = 1
 const DurationWeight = 1
-const BeatWeight = 1
+const BeatWeight = 15
 const ConfidenceWeight = 1
 const IdentityWeight = 10000
 
@@ -182,6 +183,11 @@ func RequestProc() {
 			}
 		}
 
+		playqlock.Lock()
+		log.Println("putting",s.Artist,s.Title,"to queue")
+		playqueue[playq{s.Artist,s.Title}] = true
+		playqlock.Unlock()
+
 		// once we get analysis, start grabbing samples
 		go func() {
 			var ar AudioRequest
@@ -266,6 +272,10 @@ func RequestProc() {
 		
 	}
 }
+
+type playq struct{Artist,Title string}
+var playqueue = make(map[playq]bool)
+var playqlock sync.RWMutex
 
 var allSegments []Segment
 
