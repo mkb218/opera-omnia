@@ -238,29 +238,30 @@ func RequestProc() {
 				ss.root = segment
 				sort.Sort(ss)
 				if len(ss.slice) > 0 {
-				var outs Segment = ss.slice[0]
-				// var mindist float64 = -1
-				// var distcount int
-				// for _, b := range allSegs.Segs {
-				// 	outs = b
-				// 	if mindist < 0 {
-				// 		mindist = Distance(&segment, &outs)
-				// 		log.Println("m", mindist)
-				// 	} else if distcount < 10 {
-				// 		if d := Distance(&segment, &outs); d < mindist {
-				// 			mindist = d
-				// 			distcount++
-				// 			log.Println(mindist)
-				// 		}
-				// 	} else {
-				// 		break
-				// 	}
-				// }
-				outs.RootDuration = segment.Duration
-				outs.RootLoudnessMax = segment.LoudnessMax
-				outs.RootLoudnessStart = segment.LoudnessStart
-				outlen += segment.Duration
-				ar.segments = append(ar.segments, outs)
+					var outs Segment = ss.slice[0]
+					log.Println("distance", ss.slice[0].Distance)
+					// var mindist float64 = -1
+					// var distcount int
+					// for _, b := range allSegs.Segs {
+					// 	outs = b
+					// 	if mindist < 0 {
+					// 		mindist = Distance(&segment, &outs)
+					// 		log.Println("m", mindist)
+					// 	} else if distcount < 10 {
+					// 		if d := Distance(&segment, &outs); d < mindist {
+					// 			mindist = d
+					// 			distcount++
+					// 			log.Println(mindist)
+					// 		}
+					// 	} else {
+					// 		break
+					// 	}
+					// }
+					outs.RootDuration = segment.Duration
+					outs.RootLoudnessMax = segment.LoudnessMax
+					outs.RootLoudnessStart = segment.LoudnessStart
+					outlen += segment.Duration
+					ar.segments = append(ar.segments, outs)
 				}
 				expectedlen += segment.Duration
 			}
