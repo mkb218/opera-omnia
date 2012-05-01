@@ -237,9 +237,10 @@ func RequestProc() {
 
 				ss.root = segment
 				sort.Sort(ss)
+				var totdist float64
 				if len(ss.slice) > 0 {
 					var outs Segment = ss.slice[0]
-					log.Println("distance", ss.slice[0].Distance)
+					totdist += ss.slice[0].Distance
 					// var mindist float64 = -1
 					// var distcount int
 					// for _, b := range allSegs.Segs {
@@ -263,6 +264,7 @@ func RequestProc() {
 					outlen += segment.Duration
 					ar.segments = append(ar.segments, outs)
 				}
+				log.Println("avg distance", totdist / float64(len(ar.segments)))
 				expectedlen += segment.Duration
 			}
 			log.Println(expectedlen, outlen)
