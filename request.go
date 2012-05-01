@@ -265,9 +265,9 @@ func RequestProc() {
 					outlen += segment.Duration
 					ar.segments = append(ar.segments, outs)
 				}
-				log.Println("avg distance", totdist / float64(len(ar.segments)))
 				expectedlen += segment.Duration
 			}
+			log.Println("avg distance", totdist / float64(len(ar.segments)))
 			log.Println(expectedlen, outlen)
 			ar.artist = s.Artist
 			ar.title = s.Title
