@@ -10,6 +10,7 @@ import "net/http"
 var address string = ":9001"
 var logger string
 var templateRoot = "/Users/mkb/code/opera-omnia/templates";
+var debug bool
 
 var gofuncs []func()
 
@@ -17,6 +18,7 @@ func init() {
 	flag.StringVar(&templateRoot, "templates", templateRoot, "")
 	flag.StringVar(&address, "address", address, "")
 	flag.StringVar(&logger, "logfile", "", "")
+	flag.BoolVar(&debug, "debug", false, "")
 }
 
 func main() {

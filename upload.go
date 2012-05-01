@@ -282,13 +282,13 @@ func SetSegmentsForID(id string, segments Analysis) {
 }
 
 func DetailsForID(url, id string) (a Analysis, err error) {
-	log.Println("DetailsForID", id, url)
+	// log.Println("DetailsForID", id, url)
 	response, err := http.Get(url)
 	if err != nil {
 		log.Println("couldn't get details for", id)
 		return Analysis{}, err
 	}
-	log.Println("got", response.ContentLength, "bytes")
+	// log.Println("got", response.ContentLength, "bytes")
 	
 	var details interface{}
 	j := json.NewDecoder(response.Body)
@@ -300,15 +300,15 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 	case string:
 		a.Artist = t
 		log.Println("artist", artist)
-	default:
-		log.Println("no artist available")
+	// default:
+		// log.Println("no artist available")
 	}
 	switch t := title.(type) {
 	case string:
 		a.Title = t
 		log.Println("title", title)
 	default:
-		log.Println("no title available")
+		// log.Println("no title available")
 	}
 	jsegments, ok := mapKey(details, "segments").([]interface{})
 	if !ok {
@@ -384,7 +384,7 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 			}
 		}
 	}
-	log.Println("details OK")
+	// log.Println("details OK")
 	a.Last = time.Now()
 	return a, nil
 }
@@ -414,14 +414,14 @@ func UploadProc() {
 		var url string
 		var err error
 		if id, ok = GetIDForChecksum(m); !ok {
-			log.Println("no id for md5", m)
+			// log.Println("no id for md5", m)
 			// if not upload it to analyzer.
 			id, url, err = e.Upload(r.Filetype, r.Data)
 			if err != nil {
 				log.Println("error uploading track to EN", err)
 				continue
 			}
-			log.Println("got ID", id, "url", url, "err", err)
+			// log.Println("got ID", id, "url", url, "err", err)
 			
 			// update md5 to id mapping
 			AddIDForChecksum(m, id)
@@ -468,9 +468,9 @@ func UploadProc() {
 				
 				}
 				// add to all segments
-				log.Println("adding to all segs")
+				// log.Println("adding to all segs")
 				AddToAllSegs(a.Segments)
-				log.Println("done adding to all segs")
+				// log.Println("done adding to all segs")
 			}
 
 			// if request is marked "playback" add the ID to the request queue
@@ -542,7 +542,7 @@ func init() {
 	flag.IntVar(&bucketsize, "bucketsize", 1000, "")
 	flag.Float64Var(&initialbucketwidth, "bucketwidth", 0.01, "")
 	
-	UploadChan = make(chan UploadRequest,1)
+	UploadChan = make(chan UploadRequest,100)
 	gofuncs = append(gofuncs, UploadProc)
 	http.HandleFunc("/upload", UploadHandler)
 	rander = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -553,7 +553,7 @@ func UploadHandler(resp http.ResponseWriter, req *http.Request) {
 	if fail != nil {
 		log.Println("couldn't load template " + fail.Error())
 	}
-	log.Println(req.Header)
+	// log.Println(req.Header)
 	log.Println("upload")
 	add := (req.FormValue("add") == "on")
 	playback := (req.FormValue("playback") == "on")

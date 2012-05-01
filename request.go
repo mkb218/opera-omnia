@@ -185,7 +185,7 @@ func RequestProc() {
 		}
 
 		playqlock.Lock()
-		log.Println("putting",s.Artist,s.Title,"to queue")
+		// log.Println("putting",s.Artist,s.Title,"to queue")
 		playqueue[playq{s.Artist,s.Title}] = true
 		playqlock.Unlock()
 
@@ -268,7 +268,7 @@ func RequestProc() {
 				expectedlen += segment.Duration
 			}
 			log.Println("avg distance", totdist / float64(len(ar.segments)))
-			log.Println(expectedlen, outlen)
+			// log.Println(expectedlen, outlen)
 			ar.artist = s.Artist
 			ar.title = s.Title
 			AudioQueue <- ar
@@ -285,14 +285,14 @@ var allSegments []Segment
 
 
 func init() {
-	RequestQueue = make(chan string,1)
-	AudioQueue = make(chan AudioRequest,1)
+	RequestQueue = make(chan string,100)
+	AudioQueue = make(chan AudioRequest,100)
 	gofuncs = append(gofuncs, RequestProc)
 	http.HandleFunc("/request", RequestHandler)
 }
 
 func RequestHandler(resp http.ResponseWriter, req *http.Request) {
-	log.Println("request id")
+	// log.Println("request id")
 	t, fail := template.ParseFiles(path.Join(templateRoot, "request_fail.html"))
 	id := req.FormValue("id")
 	if len(id) == 0 {

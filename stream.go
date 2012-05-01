@@ -71,7 +71,7 @@ func init() {
 func FileProc() {
 	log.Println("starting FileProc")
 	for ar := range AudioQueue {
-		log.Println("from AudioQueue", ar.artist, ar.title)
+		// log.Println("from AudioQueue", ar.artist, ar.title)
 //		f := File{ar.artist, ar.title, make([]byte,0)}
 		p, err := exec.LookPath("lame")
 		if err != nil {
@@ -95,12 +95,12 @@ func FileProc() {
 			log.Println(string(b.Bytes()))
 			continue
 		}
-		log.Println("dumpchan send")
+		// log.Println("dumpchan send")
 		playqlock.Lock()
 		delete(playqueue, playq{ar.artist, ar.title})
 		playqlock.Unlock()
 		dumpchan <- path.Base(f)
-		log.Println("dumpchan sent")
+		// log.Println("dumpchan sent")
 	}
 }
 

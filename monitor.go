@@ -1,5 +1,6 @@
 package main
 
+import "fmt"
 import "sync"
 import "flag"
 import "time"
@@ -54,12 +55,15 @@ func monitor() {
 	logfile = rotate()
 	for {
 		time.Sleep(15*time.Minute)
-		dumpStackTrace()
+		fmt.Fprintf(logfile, "dumpchan %d\n", len(dumpchan))
+		fmt.Fprintf(logfile, "RequestQueue %d\n", len(RequestQueue))
+		fmt.Fprintf(logfile, "AudioQueue %d\n", len(AudioQueue))
+		fmt.Fprintf(logfile, "UploadChan %d\n", len(UploadChan))
 	}
 }
 
 func signalHandler() {
-	c := make(chan os.Signal, 1)
+	c := make(chan os.Signal, 100)
 	signal.Notify(c, os.Interrupt)
 	for {
 		_ = <- c

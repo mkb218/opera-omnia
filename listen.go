@@ -29,15 +29,15 @@ func ListenProc() {
 			}
 		}
 		g.Close()
-		log.Println("loaded", len(listen.M),"listen stats. next file is #",listen.Count)
+		// log.Println("loaded", len(listen.M),"listen stats. next file is #",listen.Count)
 	} else {
 		listen.M = make(map[string]bool)
 		log.Println("couldn't load listen stats", err)
 	}
 	listenlock.Unlock()
-	log.Println("unlocked write lock ListenProc")
+	// log.Println("unlocked write lock ListenProc")
 	listenlock.RLock()
-	log.Println("locked read lock ListenProc")
+	// log.Println("locked read lock ListenProc")
 	d, err := os.OpenFile(dumppath, os.O_RDONLY, 0600)
 	if err != nil {
 		log.Fatalln("dumppath should have been created by now", err)
@@ -72,20 +72,22 @@ func ListenProc() {
 	log.Println("unlocked read lock ListenProc")
 	for d := range dumpchan {
 		log.Println("recvd", d)
-		listenlock.Lock()
-		listen.M[d] = true
-		g, err := os.Create(path.Join(MapGobPath, "listen"))
-		if err == nil {
-			ge := gob.NewEncoder(g)
-			err = ge.Encode(&listen)
-			if err != nil {
-				log.Println("error writing stats", err)
+		func() {
+			listenlock.Lock()
+			defer listenlock.Unlock()
+			listen.M[d] = true
+			g, err := os.Create(path.Join(MapGobPath, "listen"))
+			if err == nil {
+				ge := gob.NewEncoder(g)
+				err = ge.Encode(&listen)
+				if err != nil {
+					log.Println("error writing stats", err)
+				}
+				g.Close()
+			} else {
+				log.Println("couldn't write listen stats", err)
 			}
-			g.Close()
-		} else {
-			log.Println("couldn't write listen stats", err)
-		}
-		listenlock.Unlock()
+		}()
 		log.Println("done with write lock ListenProc")
 	}
 }
@@ -99,7 +101,7 @@ func ListenHandler(resp http.ResponseWriter, req *http.Request) {
 	log.Println("ListenHandler waiting")
 	listenlock.RLock()
 	defer listenlock.RUnlock()
-	log.Println("ListenHandler", *req)
+	// log.Println("ListenHandler", *req)
 	
 	// if no arg, serve template with listen
 	f := req.FormValue("file")
@@ -132,7 +134,7 @@ func ListenHandler(resp http.ResponseWriter, req *http.Request) {
 }
 
 func init() {
-	dumpchan = make(chan string,1)
+	dumpchan = make(chan string,100)
 	gofuncs = append(gofuncs, ListenProc)
 	http.HandleFunc("/listen", ListenHandler)
 }
