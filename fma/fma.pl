@@ -15,7 +15,7 @@ my $apikey = $ARGV[0];
 
 my @sorts = qw(track_id track_title track_date_recorded track_listens track_favorites track_date_created);
 my $sort = $sorts[int(rand(@sorts))];
-my $baseurl = "http://freemusicarchive.org/api/get/tracks.json?sort_by=$sort&limit=1&sort_dir=desc&page=%s&api_key=$apikey";
+my $baseurl = "http://freemusicarchive.org/api/get/tracks.json?sort_by=$sort&limit=1&sort_dir=desc&page=%s&api_key=$apikey&remix=true";
 
 my $page = 1;
 while (1) {
@@ -25,7 +25,7 @@ while (1) {
     }
     my $data = from_json($content);
     my $track_id = $data->{dataset}[0]{track_id};
-    if (defined($ids{$track_id}) && $ids{$track_id}) {
+    if ((defined($ids{$track_id}) && $ids{$track_id}) || $data->{dataset}[0]{license_title} =~ /{
         $page++;
         next;
     }
