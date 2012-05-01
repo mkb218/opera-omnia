@@ -59,7 +59,7 @@ func monitor() {
 		fmt.Fprintf(logfile, "RequestQueue %d\n", len(RequestQueue))
 		fmt.Fprintf(logfile, "AudioQueue %d\n", len(AudioQueue))
 		fmt.Fprintf(logfile, "UploadChan %d\n", len(UploadChan))
-		fmt.Fprintln("----")
+		fmt.Fprintln(logfile,"----")
 		time.Sleep(5*time.Minute)
 	}
 }

@@ -84,16 +84,17 @@ func initAllSegs() {
 	if err != nil {
 		log.Println("error opening map gob file", err)
 		allSegs.Segs = make(map[SegmentID]Segment)
-		for i := 0; i < 12; i++ {
-//			allSegs.timbre[i].width = initialbucketwidth
-//			allSegs.Pitch[i].Width = initialbucketwidth
-//			allSegs.Pitch[i].Segments = make([][]SegmentID, int(float64(1)/initialbucketwidth)+1)
-		}
 		return
 	}
 	defer r.Close()
 	g := gob.NewDecoder(r)
-	g.Decode(&allSegs)
+	g.Decode(&allSegs) 
+	for k, v := range allSegs.Segs {
+		fi, err := os.Stat(v.File)
+		if err != nil || fi.IsDir() {
+			delete(allSegs.Segs, k)
+		}
+	}
 	log.Println("decoded", len(allSegs.Segs), "segments")
 }
 

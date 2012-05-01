@@ -1,5 +1,6 @@
 package main
 
+import "os"
 import "sync"
 import "bytes"
 import "fmt"
@@ -240,30 +241,37 @@ func RequestProc() {
 				ss.root = segment
 				sort.Sort(ss)
 				if len(ss.slice) > 0 {
-					var outs Segment = ss.slice[0]
-					totdist += ss.slice[0].Distance
-					// var mindist float64 = -1
-					// var distcount int
-					// for _, b := range allSegs.Segs {
-					// 	outs = b
-					// 	if mindist < 0 {
-					// 		mindist = Distance(&segment, &outs)
-					// 		log.Println("m", mindist)
-					// 	} else if distcount < 10 {
-					// 		if d := Distance(&segment, &outs); d < mindist {
-					// 			mindist = d
-					// 			distcount++
-					// 			log.Println(mindist)
-					// 		}
-					// 	} else {
-					// 		break
-					// 	}
-					// }
-					outs.RootDuration = segment.Duration
-					outs.RootLoudnessMax = segment.LoudnessMax
-					outs.RootLoudnessStart = segment.LoudnessStart
-					outlen += segment.Duration
-					ar.segments = append(ar.segments, outs)
+					for snum := 0; snum < len(ss.slice); snum++ {
+						fi, err := os.Stat(ss.slice[snum].File)
+						if err != nil || fi.IsDir(){
+							log.Println("couldn't stat",ss.slice[snum].File,"nil means IsDir",err)
+							continue
+						}
+						var outs Segment = ss.slice[snum]
+						totdist += outs.Distance
+						// var mindist float64 = -1
+						// var distcount int
+						// for _, b := range allSegs.Segs {
+						// 	outs = b
+						// 	if mindist < 0 {
+						// 		mindist = Distance(&segment, &outs)
+						// 		log.Println("m", mindist)
+						// 	} else if distcount < 10 {
+						// 		if d := Distance(&segment, &outs); d < mindist {
+						// 			mindist = d
+						// 			distcount++
+						// 			log.Println(mindist)
+						// 		}
+						// 	} else {
+						// 		break
+						// 	}
+						// }
+						outs.RootDuration = segment.Duration
+						outs.RootLoudnessMax = segment.LoudnessMax
+						outs.RootLoudnessStart = segment.LoudnessStart
+						outlen += segment.Duration
+						ar.segments = append(ar.segments, outs)
+					}
 				}
 				expectedlen += segment.Duration
 			}
