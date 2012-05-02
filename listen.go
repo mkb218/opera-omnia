@@ -98,7 +98,7 @@ type listendata struct {
 }
 
 func ListenHandler(resp http.ResponseWriter, req *http.Request) {
-	log.Println("ListenHandler waiting")
+	// log.Println("ListenHandler waiting")
 	listenlock.RLock()
 	defer listenlock.RUnlock()
 	// log.Println("ListenHandler", *req)
@@ -116,7 +116,6 @@ func ListenHandler(resp http.ResponseWriter, req *http.Request) {
 			log.Println("template error", err)
 			return
 		}
-		log.Println("listen template")
 		playqlock.RLock()
 		defer playqlock.RUnlock()
 		err = t.Execute(resp, listendata{listen.M, playqueue})
