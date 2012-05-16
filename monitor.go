@@ -1,5 +1,6 @@
 package main
 
+import "math"
 import "fmt"
 import "sync"
 import "flag"
@@ -7,6 +8,7 @@ import "time"
 import "runtime"
 import "log"
 import "os"
+import "io"
 import "os/signal"
 
 var stackbuf []byte = make([]byte, 102400)
@@ -51,6 +53,67 @@ func rotate() *os.File {
 	return f
 }
 
+func dumpHisto(w io.Writer) {
+	ss := make([][]int, 25)
+	for i := range ss {
+		ss[i] = make([]int, 40)
+	}
+	func () {
+		allSegsLock.RLock()
+		defer allSegsLock.RUnlock()
+		
+		for _, v := range allSegs.Segs {
+			for i := 0; i < 12; i++ {
+				trg := int(v.Pitches[i] * 40)
+				if trg == 40 {
+					trg--
+				}
+				ss[i][trg]++
+			}
+			for i := 0; i < 12; i++ {
+				t := int(math.Log10(math.Abs(v.Timbre[i])+1))
+				if v.Timbre[i] > 0 {
+					t += 20
+				} else {
+					t = 19 - t
+				}
+				if t < 0 {
+					t = 0
+				}
+				if t > 39 {
+					t = 39
+				}
+				
+				ss[i+12][t]++
+			}
+			trg := int(v.BeatDistance * 40)
+			if trg >= 40 {
+				trg = 39
+			}			
+			ss[24][trg]++
+		}
+	}()
+	for _, g := range ss {
+		max := 0
+		for _, v := range g {
+			if v > max {
+				max = v
+			}
+		}
+		for h := max; h > 0; h-- {
+			for v := range g {
+				if v >= h {
+					w.Write([]byte{'#'})
+				} else {
+					w.Write([]byte{' '})
+				}
+			}
+			w.Write([]byte{'\n'})
+		}
+		w.Write([]byte("====\n"))
+	}
+}
+
 func monitor() {
 	logfile = rotate()
 	for {
@@ -59,6 +122,7 @@ func monitor() {
 		fmt.Fprintf(logfile, "RequestQueue %d\n", len(RequestQueue))
 		fmt.Fprintf(logfile, "AudioQueue %d\n", len(AudioQueue))
 		fmt.Fprintf(logfile, "UploadChan %d\n", len(UploadChan))
+		dumpHisto(logfile)
 		fmt.Fprintln(logfile,"----")
 		time.Sleep(5*time.Minute)
 	}

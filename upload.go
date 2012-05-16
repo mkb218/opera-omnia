@@ -70,7 +70,7 @@ type Bucket struct {
 	Segments [][]SegmentID
 }
 
-var allSegsLock sync.Mutex
+var allSegsLock sync.RWMutex
 var allSegs struct {
 	Segs map[SegmentID]Segment
 //	timbre [12]bucket

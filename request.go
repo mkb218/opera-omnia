@@ -4,7 +4,6 @@ import "os"
 import "sync"
 import "bytes"
 import "fmt"
-import "sort"
 import "math"
 import "net/http"
 import "log"
@@ -31,11 +30,11 @@ type SegSortSlice struct {
 const Loudness_min = -20
 const TimbreWeight = 14
 const PitchWeight = 10
-const LoudStartWeight = 1
-const LoudMaxWeight = 1
-const DurationWeight = 1
+const LoudStartWeight = 0
+const LoudMaxWeight = 0
+const DurationWeight = 0
 const BeatWeight = 15
-const ConfidenceWeight = 1
+const ConfidenceWeight = 0
 const IdentityWeight = 10000
 
 func Distance(s, s0 *Segment) float64 {
@@ -193,8 +192,8 @@ func RequestProc() {
 		// once we get analysis, start grabbing samples
 		go func() {
 			var ar AudioRequest
-			allSegsLock.Lock()
-			defer allSegsLock.Unlock()
+			allSegsLock.RLock()
+			defer allSegsLock.RUnlock()
 			expectedlen := float64(0)
 			outlen := float64(0)
 			var totdist float64
@@ -231,24 +230,29 @@ func RequestProc() {
 				}*/
 				
 				// ss.slice = make([]Segment, 0, len(m))
-				for k/*, b*/ := range allSegs.Segs {
+				closestDistance := float64(-1)
+				var nearestSeg SegmentID
+				for k, b := range allSegs.Segs {
 					if allSegs.Segs[k].LoudnessMax > Loudness_min {
-						ss.slice = append(ss.slice, allSegs.Segs[k])
-						ss.slice[len(ss.slice)-1].Distance = Distance(&segment, &ss.slice[len(ss.slice)-1])
+						thisDist := Distance(&segment, &ss.slice[len(ss.slice)-1])
+						if closestDistance < 0 || thisDist < closestDistance {
+							fi, err := os.Stat(b.File)
+							if err != nil || fi.IsDir(){
+								log.Println("couldn't stat",b.File,"nil means IsDir",err)
+								continue
+							}
+							closestDistance = thisDist
+							nearestSeg = k
+						}
 					}
 				}
 
-				ss.root = segment
-				sort.Sort(ss)
-				if len(ss.slice) > 0 {
-					for snum := 0; snum < len(ss.slice); snum++ {
-						fi, err := os.Stat(ss.slice[snum].File)
-						if err != nil || fi.IsDir(){
-							log.Println("couldn't stat",ss.slice[snum].File,"nil means IsDir",err)
-							continue
-						}
-						var outs Segment = ss.slice[snum]
-						totdist += outs.Distance
+				// ss.root = segment
+				// sort.Sort(ss)
+				// if len(ss.slice) > 0 {
+					// for snum := 0; snum < len(ss.slice); snum++ {
+				var outs Segment = allSegs.Segs[nearestSeg]
+				totdist += outs.Distance
 						// var mindist float64 = -1
 						// var distcount int
 						// for _, b := range allSegs.Segs {
@@ -266,13 +270,13 @@ func RequestProc() {
 						// 		break
 						// 	}
 						// }
-						outs.RootDuration = segment.Duration
-						outs.RootLoudnessMax = segment.LoudnessMax
-						outs.RootLoudnessStart = segment.LoudnessStart
-						outlen += segment.Duration
-						ar.segments = append(ar.segments, outs)
-					}
-				}
+				outs.RootDuration = segment.Duration
+				outs.RootLoudnessMax = segment.LoudnessMax
+				outs.RootLoudnessStart = segment.LoudnessStart
+				outlen += segment.Duration
+				ar.segments = append(ar.segments, outs)
+					// }
+				// }
 				expectedlen += segment.Duration
 			}
 			log.Println("avg distance", totdist / float64(len(ar.segments)))
