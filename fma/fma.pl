@@ -51,4 +51,9 @@ while (1) {
     print "\n";
     last;
 }
+open IDS, ">id.txt";
+for (key %ids) {
+	print IDS "$_\n";
+}
+close IDS;
 dbmclose(%ids);
