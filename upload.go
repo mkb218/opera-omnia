@@ -70,7 +70,7 @@ type Bucket struct {
 	Segments [][]SegmentID
 }
 
-var allSegsLock sync.Mutex
+var allSegsLock sync.RWMutex
 var allSegs struct {
 	Segs map[SegmentID]Segment
 //	timbre [12]bucket
@@ -88,7 +88,10 @@ func initAllSegs() {
 	}
 	defer r.Close()
 	g := gob.NewDecoder(r)
-	g.Decode(&allSegs) 
+	err = g.Decode(&allSegs) 
+	if err != nil {
+		log.Println("error decoding allSegs", err)
+	}
 	for k, v := range allSegs.Segs {
 		fi, err := os.Stat(v.File)
 		if err != nil || fi.IsDir() {
@@ -470,6 +473,7 @@ func UploadProc() {
 				}
 				// add to all segments
 				// log.Println("adding to all segs")
+				go func() { attributionChan <- en_tuple{id, playq{a.Artist, a.Title} } }()
 				AddToAllSegs(a.Segments)
 				// log.Println("done adding to all segs")
 			}

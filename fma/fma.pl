@@ -25,11 +25,11 @@ while (1) {
     }
     my $data = from_json($content);
     my $track_id = $data->{dataset}[0]{track_id};
-    if ((defined($ids{$track_id}) && $ids{$track_id}) || $data->{dataset}[0]{license_title} =~ /{
+    if (defined($ids{$track_id}) && $ids{$track_id}) {
         $page++;
         next;
     }
-    $ids{$track_id} = 1;
+    $ids{$track_id} = $data->{dataset}[0]{track_id};
     
     my $track_url = $data->{dataset}[0]{track_url};
     $track_url .= "/download";
@@ -51,9 +51,10 @@ while (1) {
     print "\n";
     last;
 }
-open IDS, ">id.txt";
-for (key %ids) {
-	print IDS "$_\n";
-}
-close IDS;
+
+my $jout = to_json(\%ids);
+open JIDS, ">", "gobs/ids.json";
+print JIDS $jout;
+close JIDS;
+
 dbmclose(%ids);

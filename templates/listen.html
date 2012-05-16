@@ -1,5 +1,6 @@
 <html>
 	<head><title>Opera Omnia - Listen</title>
+		<link rel="stylesheet" type="text/css" href="operaomnia.css" />
 		
 		<script type="text/javascript">
 
@@ -23,6 +24,7 @@
 		<p>In Queue:<ul>
 		{{range $index, $element := .Queue}}<li>{{$index.Artist}} - {{$index.Title}}</li>{{end}}
 		</ul></p>
+		<p><a href="attributions">Attributions</a></p>
 		<h6>&copy; Matt Kane 2012. A product of <a href="http://rethink.musichackathon.org/">the Rethink Music Hackers' Weekend</a>. <a href="http://github.com/mkb218/opera-omnia">github</a>. <a href="http://twitter.com/nynexrepublic">@nynexrepublic</a>. <a href="http://nynex.hydrogenproject.com">blog</a>. <a href="https://www.facebook.com/RepublicOfNynex">Facebook</a>.</h6>
 	</body>
 </html>
