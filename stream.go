@@ -34,7 +34,7 @@ var dumppath string
 func init() {
 	flag.IntVar(&bitrate, "bitrate", 64, "kbps")
 	flag.IntVar(&samplerate, "samplerate", 44100, "")
-	flag.StringVar(&dumppath, "dumppath", "/Users/mkb/code/opera-omnia/dump", "MUST EXIST")
+	flag.StringVar(&dumppath, "dumppath", "./dump", "MUST EXIST")
 //	FileQueue = make(chan File, 10)
 	gofuncs = append(gofuncs, FileProc)
 //	gofuncs = append(gofuncs, StreamProc)

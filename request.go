@@ -198,7 +198,7 @@ func RequestProc() {
 			outlen := float64(0)
 			var totdist float64
 			for _, segment := range s.Segments {
-				var ss SegSortSlice
+				// var ss SegSortSlice
 //				m := make(map[SegmentID]bool)
 /*				var pitches = []int{12,12,12}
 				// find highest three pitches in segment
@@ -234,7 +234,7 @@ func RequestProc() {
 				var nearestSeg SegmentID
 				for k, b := range allSegs.Segs {
 					if allSegs.Segs[k].LoudnessMax > Loudness_min {
-						thisDist := Distance(&segment, &ss.slice[len(ss.slice)-1])
+						thisDist := Distance(&segment, &b)
 						if closestDistance < 0 || thisDist < closestDistance {
 							fi, err := os.Stat(b.File)
 							if err != nil || fi.IsDir(){

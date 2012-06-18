@@ -9,7 +9,7 @@ import "net/http"
 
 var address string = ":9001"
 var logger string
-var templateRoot = "/Users/mkb/code/opera-omnia/templates";
+var templateRoot = "./templates";
 var debug bool
 
 var gofuncs []func()

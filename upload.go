@@ -62,14 +62,6 @@ type SegmentID struct {
 	Index int
 }
 
-var bucketsize int
-var initialbucketwidth float64
-
-type Bucket struct {
-	Width float64
-	Segments [][]SegmentID
-}
-
 var allSegsLock sync.RWMutex
 var allSegs struct {
 	Segs map[SegmentID]Segment
@@ -541,11 +533,9 @@ func openBuf(data []byte, filetype string) (obuf []byte, err error) {
 var rander *rand.Rand
 
 func init() {
-	flag.StringVar(&MapGobPath, "mapgobpath", "/Users/mkb/code/opera-omnia/gobs", "")
-	flag.StringVar(&samplepath, "samples", "/Users/mkb/code/opera-omnia/samples", "")
+	flag.StringVar(&MapGobPath, "mapgobpath", "./gobs", "")
+	flag.StringVar(&samplepath, "samples", "./samples", "")
 	flag.StringVar(&echonestkey, "echonestkey", "", "")
-	flag.IntVar(&bucketsize, "bucketsize", 1000, "")
-	flag.Float64Var(&initialbucketwidth, "bucketwidth", 0.01, "")
 	
 	UploadChan = make(chan UploadRequest,100)
 	gofuncs = append(gofuncs, UploadProc)
