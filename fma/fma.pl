@@ -38,11 +38,11 @@ while (1) {
     my $ua = LWP::UserAgent->new;
     my $play = "off";
     if (rand() < 0.001) {
-	$play = "on";
+        $play = "on";
     }
     my %args = ( add => "on",
                 filetype => "mp3",
-		play => $play,
+                play => $play,
                 filedata => ["fma.tmp"]);
     my $worked = $ua->request(POST "http://brainchamber.hydrogenproject.com:9001/upload?add=on&filetype=mp3", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
