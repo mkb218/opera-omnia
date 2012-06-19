@@ -12,6 +12,12 @@ my %ids;
 dbmopen(%ids,"ids",0666);
 
 my $apikey = $ARGV[0];
+my $hostport;
+if (!defined($ARGV[1])) {
+    $hostport = "localhost:9001";
+} else {
+    $hostport = $ARGV[1];
+}
 
 my @sorts = qw(track_id track_title track_date_recorded track_listens track_favorites track_date_created);
 my $sort = $sorts[int(rand(@sorts))];
@@ -23,7 +29,14 @@ while (1) {
     if (!defined($content)) {
         warn $!;
     }
-    my $data = from_json($content);
+    my $data;
+    eval {
+        $data = from_json($content);
+    };
+    if ($@) {
+        warn $@;
+        next;
+    }
     my $track_id = $data->{dataset}[0]{track_id};
     if (defined($ids{$track_id}) && $ids{$track_id}) {
         $page++;
@@ -44,7 +57,7 @@ while (1) {
                 filetype => "mp3",
                 play => $play,
                 filedata => ["fma.tmp"]);
-    my $worked = $ua->request(POST "http://brainchamber.hydrogenproject.com:9001/upload?add=on&filetype=mp3", Content => \%args, Content_Type => 'form-data');
+    my $worked = $ua->request(POST "http://$hostport:9001/upload?add=on&filetype=mp3", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
     print " ";
     print $worked->content;
