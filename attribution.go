@@ -62,7 +62,7 @@ func AttributionHandler(resp http.ResponseWriter, req *http.Request) {
 		log.Println("error reading fma ids", err)
 	} else {
 		jd := json.NewDecoder(j)
-		err = jd.Decode(fma_data)
+		err = jd.Decode(&fma_data)
 		if err != nil {
 			log.Println("error decoding fma ids", err)
 		}
