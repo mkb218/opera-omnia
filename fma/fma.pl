@@ -75,8 +75,9 @@ while (1) {
                 filedata => ["fma.tmp"]);
     my $worked = $ua->request(POST "http://$hostport:9001/upload?add=on&filetype=mp3", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
-    print " ";
-    print $worked->content;
+   print " ";
+#    print $worked->content;
+    print $track_id;
     print "\n";
     last;
 }
