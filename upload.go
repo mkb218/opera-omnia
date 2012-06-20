@@ -473,6 +473,7 @@ func UploadProc() {
 
 			// if request is marked "playback" add the ID to the request queue
 			if r.Playback {
+				log.Println("RequestQueue", id")
 				RequestQueue <- id
 			}
 		}()
