@@ -7,9 +7,24 @@ use LWP::UserAgent;
 use JSON;
 use HTTP::Request::Common;
 
+use const JIDS_FILE => "gobs/ids.json";
+
 my %ids;
 
-dbmopen(%ids,"ids",0666);
+eval {
+    open JIDS, "<", JIDS_FILE or die $!
+    my $buf;
+    my $string = "";
+    my $bytesread;
+    while ($bytesread = read(JIDS, $buf, 1024)) {
+        $string .= $buf;
+    }
+    %ids = %{ from_json($string) };
+}
+
+if ($@) {
+    warn $@;
+}
 
 my $apikey = $ARGV[0];
 my $hostport;
@@ -45,8 +60,8 @@ while (1) {
     $ids{$track_id} = $data->{dataset}[0]{track_id};
     
     my $track_url = $data->{dataset}[0]{track_url};
-    $track_url .= "/download";
-    my $rawdata = getstore($track_url, "fma.tmp");
+    my $download_url = "$track_url/download";
+    my $rawdata = getstore($download_url, "fma.tmp");
     print length($rawdata)."\n";
     my $ua = LWP::UserAgent->new;
     my $play = "off";
@@ -56,6 +71,7 @@ while (1) {
     my %args = ( add => "on",
                 filetype => "mp3",
                 play => $play,
+                fma_url => $track_url,
                 filedata => ["fma.tmp"]);
     my $worked = $ua->request(POST "http://$hostport:9001/upload?add=on&filetype=mp3", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
@@ -66,8 +82,6 @@ while (1) {
 }
 
 my $jout = to_json(\%ids);
-open JIDS, ">", "gobs/ids.json";
+open JIDS, ">", JIDS_FILE or die $!;
 print JIDS $jout;
 close JIDS;
-
-dbmclose(%ids);

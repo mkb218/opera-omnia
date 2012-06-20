@@ -126,6 +126,7 @@ type UploadRequest struct {
 	Filetype string
 	Add bool
 	Playback bool
+	Fma_url string
 }
 
 func minOf(i, j int64) int64 {
@@ -465,7 +466,7 @@ func UploadProc() {
 				}
 				// add to all segments
 				// log.Println("adding to all segs")
-				go func() { attributionChan <- en_tuple{id, playq{a.Artist, a.Title} } }()
+				go func() { attributionChan <- en_tuple{id, playq{a.Artist, a.Title, r.Fma_url} } }()
 				AddToAllSegs(a.Segments)
 				// log.Println("done adding to all segs")
 			}
@@ -553,7 +554,8 @@ func UploadHandler(resp http.ResponseWriter, req *http.Request) {
 	add := (req.FormValue("add") == "on")
 	playback := (req.FormValue("playback") == "on")
 	filetype := req.FormValue("filetype")
-	log.Println(add, playback, filetype)
+	fma_url := req.FormValue("fma_url")
+	log.Println(add, playback, filetype, fma_url)
 	file, _, err := req.FormFile("filedata")
 	if !add && !playback {
 		if fail != nil {
@@ -583,7 +585,7 @@ func UploadHandler(resp http.ResponseWriter, req *http.Request) {
 	}
 	
 	// build the request to go into the channel
-	r := UploadRequest{make([]byte, req.ContentLength), filetype, add, playback}
+	r := UploadRequest{make([]byte, req.ContentLength), filetype, add, playback, fma_url}
 	n, err := file.Read(r.Data)
 	if err != nil {
 		if fail != nil {

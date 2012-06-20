@@ -7,14 +7,14 @@ import "path"
 import "net/http"
 // import "github.com/mkb218/egonest/src/echonest"
 import "sync"
-import "encoding/json"
+// import "encoding/json"
 import "encoding/gob"
 
-type Fma struct {
-	Track_url string `json:"track_url"`
-	Track_title string `json:"track_title"`
-	Artist_name string `json:"artist_name"`
-}
+// type Fma struct {
+// 	Track_url string `json:"track_url"`
+// 	Track_title string `json:"track_title"`
+// 	Artist_name string `json:"artist_name"`
+// }
 var en_datalock sync.RWMutex
 var en_data = make(map[string]playq)
 type en_tuple struct {
@@ -54,20 +54,6 @@ func AttributionHandler(resp http.ResponseWriter, req *http.Request) {
 			g.Close()
 		}
 	}()
-
-	// read json with fma data
-	var fma_data = make(map[int]Fma)
-	j, err := os.Open(path.Join(MapGobPath, "ids.json"))
-	if err != nil {
-		log.Println("error reading fma ids", err)
-	} else {
-		jd := json.NewDecoder(j)
-		err = jd.Decode(&fma_data)
-		if err != nil {
-			log.Println("error decoding fma ids", err)
-		}
-		j.Close()
-	}
 	
 	en_datalock.RLock()
 	defer en_datalock.RUnlock()
@@ -82,9 +68,8 @@ func AttributionHandler(resp http.ResponseWriter, req *http.Request) {
 		log.Println("template error", err)
 		return
 	}
-	en_datalock.RLock()
-	defer en_datalock.RUnlock()
-	err = t.Execute(resp, struct{E map[string]playq; J map[int]Fma}{en_data, fma_data})
+	
+	err = t.Execute(resp, en_data)
 	if err != nil {
 		http.Error(resp, err.Error(), 500)
 		log.Println("attribution template error", err)
@@ -100,7 +85,7 @@ func AttributionStart() {
 		log.Println("couldn't open en_data attributions")
 	} else {
 		gd := gob.NewDecoder(g)
-		err = gd.Decode(en_data)
+		err = gd.Decode(&en_data)
 		if err != nil {
 			log.Println("couldn't decode en_data", err)
 		}

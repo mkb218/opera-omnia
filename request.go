@@ -289,7 +289,7 @@ func RequestProc() {
 	}
 }
 
-type playq struct{Artist,Title string}
+type playq struct{Artist,Title,Url string}
 var playqueue = make(map[playq]bool)
 var playqlock sync.RWMutex
 
