@@ -19,7 +19,7 @@
 	<body>
 		<h1>Opera Omnia's output is composed of the following contributions.</h1>
 		<p>Uploaded by Users Like You (or snagged from the Free Music Archive):<ul>
-			{{range $index, $element := .E}}<li>{{if $element.Url}}<a href="{{$element.Url}}"/>{{end}}{{$element.Artist}} - {{$element.Title}}{{if $element.Url}}</a>{{end}}</li>{{end}}
+			{{range $index, $element := .}}<li>{{if $element.Url}}<a href="{{$element.Url}}"/>{{end}}{{$element.Artist}} - {{$element.Title}}{{if $element.Url}}</a>{{end}}</li>{{end}}
 		</ul></p>
 		<h6>&copy; Matt Kane 2012. A product of <a href="http://rethink.musichackathon.org/">the Rethink Music Hackers' Weekend</a>. <a href="http://github.com/mkb218/opera-omnia">github</a>. <a href="http://twitter.com/nynexrepublic">@nynexrepublic</a>. <a href="http://nynex.hydrogenproject.com">blog</a>. <a href="https://www.facebook.com/RepublicOfNynex">Facebook</a>.</h6>
 	</body>

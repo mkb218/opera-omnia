@@ -7,12 +7,12 @@ use LWP::UserAgent;
 use JSON;
 use HTTP::Request::Common;
 
-use const JIDS_FILE => "gobs/ids.json";
+use constant JIDS_FILE => "gobs/ids.json";
 
 my %ids;
 
 eval {
-    open JIDS, "<", JIDS_FILE or die $!
+    open JIDS, "<", JIDS_FILE or die $!;
     my $buf;
     my $string = "";
     my $bytesread;
@@ -20,7 +20,7 @@ eval {
         $string .= $buf;
     }
     %ids = %{ from_json($string) };
-}
+};
 
 if ($@) {
     warn $@;

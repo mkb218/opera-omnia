@@ -186,7 +186,7 @@ func RequestProc() {
 
 		playqlock.Lock()
 		// log.Println("putting",s.Artist,s.Title,"to queue")
-		playqueue[playq{s.Artist,s.Title}] = true
+		playqueue[playq{s.Artist,s.Title, ""}] = true
 		playqlock.Unlock()
 
 		// once we get analysis, start grabbing samples

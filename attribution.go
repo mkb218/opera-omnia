@@ -32,10 +32,13 @@ func AttributionHandler(resp http.ResponseWriter, req *http.Request) {
 		OUTER: for {
 			select {
 			case a := <- attributionChan:
+				log.Println("attr received", a)
 				en_datalock.Lock()
+				log.Println("attr lock obtained", a)
 				en_data[a.string] = a.playq
 				en_datalock.Unlock()
 			default:
+				log.Println("attr channel empty")
 				break OUTER
 			}
 		}
@@ -68,7 +71,8 @@ func AttributionHandler(resp http.ResponseWriter, req *http.Request) {
 		log.Println("template error", err)
 		return
 	}
-	
+
+	log.Println(en_data)
 	err = t.Execute(resp, en_data)
 	if err != nil {
 		http.Error(resp, err.Error(), 500)

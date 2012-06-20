@@ -102,7 +102,7 @@ func FileProc() {
 		func() {
 			playqlock.Lock()
 			defer playqlock.Unlock()
-			delete(playqueue, playq{ar.artist, ar.title})
+			delete(playqueue, playq{ar.artist, ar.title, ""})
 		}()
 		dumpchan <- path.Base(f)
 		// log.Println("dumpchan sent")
