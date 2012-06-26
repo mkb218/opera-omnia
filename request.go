@@ -28,12 +28,12 @@ type SegSortSlice struct {
 }
 
 const Loudness_min = -20
-const TimbreWeight = 14
-const PitchWeight = 10
+const TimbreWeight = 5
+const PitchWeight = 20
 const LoudStartWeight = 0
 const LoudMaxWeight = 0
 const DurationWeight = 0
-const BeatWeight = 15
+const BeatWeight = 1
 const ConfidenceWeight = 0
 const IdentityWeight = 10000
 
