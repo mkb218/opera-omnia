@@ -36,6 +36,7 @@ const DurationWeight = 0
 const BeatWeight = 1
 const ConfidenceWeight = 0
 const IdentityWeight = 10000
+const DistanceThresh = 50.0
 
 func Distance(s, s0 *Segment) float64 {
     var timbre = timbre_distance(s, s0)
@@ -243,6 +244,11 @@ func RequestProc() {
 							}
 							closestDistance = thisDist
 							nearestSeg = k
+							if thisDist < DistanceThresh {
+                                                            log.Println("distance threshold reached")
+                                                            break
+                                                        }
+
 						}
 					}
 				}
@@ -252,7 +258,7 @@ func RequestProc() {
 				// if len(ss.slice) > 0 {
 					// for snum := 0; snum < len(ss.slice); snum++ {
 				var outs Segment = allSegs.Segs[nearestSeg]
-				totdist += outs.Distance
+				totdist += closestDistance
 						// var mindist float64 = -1
 						// var distcount int
 						// for _, b := range allSegs.Segs {
