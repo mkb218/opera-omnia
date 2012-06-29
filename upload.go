@@ -282,7 +282,7 @@ func DetailsForID(url, id string) (a Analysis, err error) {
 	// log.Println("DetailsForID", id, url)
 	response, err := http.Get(url)
 	if err != nil {
-		log.Println("couldn't get details for", id)
+		log.Println("couldn't get details for", url, id)
 		return Analysis{}, err
 	}
 	// log.Println("got", response.ContentLength, "bytes")
@@ -428,6 +428,14 @@ func UploadProc() {
 		// if not then fetch the detailed analysis
 		// update id to analysis mapping
 		if a, ok = GetSegmentsForID(id); !ok {
+			if url == "" {
+				_, url, err = e.Upload(r.Filetype, r.Data)
+				if err != nil {
+					log.Println("error uploading track to EN", err)
+					continue
+				}
+				AddIDForChecksum(m, id)
+			}
 			a, err = DetailsForID(url, id)
 			if err != nil {
 				log.Println("error getting details from EN", err)
