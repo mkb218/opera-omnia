@@ -234,7 +234,6 @@ func RequestProc() {
 				// ss.slice = make([]Segment, 0, len(m))
 				closestDistance := float64(-1)
 				var nearestSeg SegmentID
-				scount := 0
 				for k, b := range allSegs.Segs {
 					if allSegs.Segs[k].LoudnessMax > Loudness_min {
 						thisDist := Distance(&segment, &b)
@@ -252,11 +251,8 @@ func RequestProc() {
 							}
 						}
 					}
-					scount++
-					if scount % (len(allSegs.Segs)/10) == 0 {
-						log.Println("playback progress",scount,len(allSegs.Segs), n, len(s.Segments))
-					}
 				}
+				log.Println("playback progress", n, len(s.Segments))
 
 				// ss.root = segment
 				// sort.Sort(ss)
