@@ -69,7 +69,7 @@ while (1) {
     my $play = "off";
     my $playchoice = rand();
     warn $playchoice;
-    if ($playchoice < 0.16) {
+    if ($playchoice < 0.05) {
 	warn "play";
         $play = "on";
     }
