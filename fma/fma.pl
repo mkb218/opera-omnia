@@ -82,6 +82,8 @@ while (1) {
     my $worked = $ua->request(POST "http://$hostport:9001/upload", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
    print " ";
+   print localtime;
+   print " ";
 #    print $worked->content;
     print $track_id;
     print "\n";
