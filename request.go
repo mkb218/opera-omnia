@@ -198,7 +198,8 @@ func RequestProc() {
 			expectedlen := float64(0)
 			outlen := float64(0)
 			var totdist float64
-			for _, segment := range s.Segments {
+			
+			for n, segment := range s.Segments {
 				// var ss SegSortSlice
 //				m := make(map[SegmentID]bool)
 /*				var pitches = []int{12,12,12}
@@ -252,8 +253,8 @@ func RequestProc() {
 						}
 					}
 					scount++
-					if scount % 1000 == 0 {
-						log.Println("playback progress",scount,len(allSegs.Segs))
+					if scount % (len(allSegs.Segs)/10) == 0 {
+						log.Println("playback progress",scount,len(allSegs.Segs), n, len(s.Segments))
 					}
 				}
 
