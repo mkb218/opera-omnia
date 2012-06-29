@@ -67,15 +67,18 @@ while (1) {
     print length($rawdata)."\n";
     my $ua = LWP::UserAgent->new;
     my $play = "off";
-    if (rand() < 0.08) {
+    my $playchoice = rand();
+    warn $playchoice;
+    if ($playchoice < 0.16) {
+	warn "play";
         $play = "on";
     }
+    warn $play;
     my %args = ( add => "on",
                 filetype => "mp3",
-                play => $play,
+                playback => $play,
                 fma_url => $track_url,
-                filedata => ["fma.tmp"],
-                add => "on");
+                filedata => ["fma.tmp"]);
     my $worked = $ua->request(POST "http://$hostport:9001/upload", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
    print " ";

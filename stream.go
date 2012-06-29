@@ -75,7 +75,7 @@ func FileProc() {
 //		f := File{ar.artist, ar.title, make([]byte,0)}
 		p, err := exec.LookPath("lame")
 		if err != nil {
-			log.Panic("no lame found! CAN'T STREAM. DYING.")
+			log.Panic("no lame found! CAN'T STREAM. DYING.", err)
 		}
 		f := func() string {
 			listenlock.Lock()
