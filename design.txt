@@ -1,43 +1,31 @@
-server indexes segments by chroma and timbre vectors. Chroma values bucketed by 0.01, timbre values bucketed by sign and log10(abs(x)). length and loudness are adjusted on output. segments stored as raw samples. maybe index by distance from previous beat or tatum also
+endpoints:
+/ - displays static page. list recent requests, ask for uploads to corpus or for requests (by uploading, or by searching).
+/search - displays search results. mark those that already have results
+/listen - lists recently published requests, stream on page
+/queue - see queued up requests, with progress indicated. errors stick around for a while
+/upload - accepts posts, redirects to queue page with request highlighted.
+/admin - ability to delete things from corpus that shouldn't be there, requires login!
 
-sound files uploaded can be specified as corpus only or as songs to be resynthesized.
+background tasks:
+resolvers: go through tatums of requests and uploads, resolving characteristics from segments
+twitter announce: duh
+soundcloud publish: upload X popular requests to soundcloud page every day
+soundcloud ingest: take downloadable, remixable, public audio from followers
+request processor: select tatums from corpus and assemble
+- fetch audio files that are members of corpus, if not present in durable corpus, byte ranges if possible
+- timestretch closest tatum to fit timebox
+- normalize peak loudness to match that of source tatum
+upload processor: store audio of corpus-bound uploads only (include soundcloud)
+- store in datastore
+FMA ingest: suck down FMA IDs, ask for analysis from echonest
+monitor: expire old corpus samples
+- expire old requests
+- spin up or kill resolvers, request processors, upload processors based on configuration file parameters
 
-web app will take anything we can give to echonest as profile ID. server side sends on channel to queue
-
-one goroutine to pop song requests from a channel and add to queue, then pop one to queue onto recreate channel
-
-one goroutine will pop songs to be recreated from recreation channel and recreate and queue for 
-
-one goroutine to act as icecast source, bind libshout. libshout needs to lock os thread!
-
-
-will need latest bootstrap and jquery i guess. worry about that part secondary to server
-
-pseudo code:
-
-type request {
-	id string
-	resynth bool
-	audio []byte
-}
-
-if request has data {
-	calculate md5, check for analysis on echonest
-	if analysis is present {
-	    store segments
-	} else {
-		send to analyzer and wait. 
-		store segments
-	}
-}
-
-type segment {
-	duration float64
-	chroma [12]float64
-	timbre [12]float64
-}
-
-type analysisbank struct {
-	lock sync.Mutex
-	bank map[string][]segment // string is id
-}
+UPLOAD TO CORPUS: 
+- separate audio into tatums
+- how to resolve segment characteristics to tatums?
+* tatums of len 5
+* if a tatum is composed of a single segment, easy
+* if a tatum contains multiple segments: multiply all interesting bits by (segment length inside tatums) / (total beat length) and sum
+* store peak loudness
