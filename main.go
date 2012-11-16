@@ -17,7 +17,6 @@ var gofuncs []func()
 func init() {
 	flag.StringVar(&templateRoot, "templates", templateRoot, "")
 	flag.StringVar(&address, "address", address, "")
-	flag.StringVar(&logger, "logfile", "", "")
 	flag.BoolVar(&debug, "debug", false, "")
 }
 
