@@ -1,6 +1,6 @@
 package main
 
-import "encoding/gob"
+/*import "encoding/gob"
 import "log"
 import "os"
 import "path"
@@ -137,3 +137,4 @@ func init() {
 	gofuncs = append(gofuncs, ListenProc)
 	http.HandleFunc("/listen", ListenHandler)
 }
+*/

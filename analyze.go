@@ -20,6 +20,10 @@ import "errors"
 import "encoding/gob"
 import "io"
 import "github.com/mkb218/egonest/src/echonest"
+import "bitbucket.org/lateefj/goriak"
+
+
+
 
 func mapKey(in interface{}, k string) interface{} {
 	if m, ok := in.(map[string]interface{}); ok {
@@ -539,7 +543,7 @@ func init() {
 	flag.StringVar(&echonestkey, "echonestkey", "", "")
 	
 	UploadChan = make(chan UploadRequest,100)
-	gofuncs = append(gofuncs, UploadProc)
+	gofuncs = append(gofuncs, AnalyzeProc)
 	http.HandleFunc("/upload", UploadHandler)
 	rander = rand.New(rand.NewSource(time.Now().UnixNano()))
 }

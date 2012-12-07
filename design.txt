@@ -7,10 +7,11 @@ endpoints:
 /admin - ability to delete things from corpus that shouldn't be there, requires login!
 
 background tasks:
+analyzers: go through uploaded audio and submit for analysis
 resolvers: go through tatums of requests and uploads, resolving characteristics from segments
 twitter announce: duh
 soundcloud publish: upload X popular requests to soundcloud page every day. including attribution list.
-soundcloud ingest: take downloadable, remixable, public audio from followers
+soundcloud ingest: take downloadable, remixable, public audio from followers for corpus and requests
 request processor: select tatums from corpus and assemble
 - fetch audio files that are members of corpus, if not present in durable corpus, byte ranges if possible
 - timestretch closest tatum to fit timebox
