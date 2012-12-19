@@ -1,0 +1,3 @@
+This project takes as input audio files from either user input or the Free Music Archive. 
+These are analyzed by the Echo Nest analyzer, then glued back together with similar tatums
+replacing the originals. 
