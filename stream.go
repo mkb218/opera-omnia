@@ -75,12 +75,12 @@ func FileProc() {
 //		f := File{ar.artist, ar.title, make([]byte,0)}
 		p, err := exec.LookPath("lame")
 		if err != nil {
-			log.Panic("no lame found! CAN'T STREAM. DYING.")
+			log.Panic("no lame found! CAN'T STREAM. DYING.", err)
 		}
 		f := func() string {
 			listenlock.Lock()
 			defer listenlock.Unlock()
-			f := ar.artist + "-" + ar.title + strconv.Itoa(listen.Count) + ".mp3"
+			f := ar.artist + "-" + ar.title + "_" + strconv.Itoa(listen.Count) + ".mp3"
 			f = path.Join(dumppath, strings.Replace(f, "/", "_", -1))
 			listen.Count++
 			return f

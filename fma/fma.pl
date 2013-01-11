@@ -38,12 +38,13 @@ my @sorts = qw(track_id track_title track_date_recorded track_listens track_favo
 my $sort = $sorts[int(rand(@sorts))];
 my $baseurl = "http://freemusicarchive.org/api/get/tracks.json?sort_by=$sort&limit=1&sort_dir=desc&page=%s&api_key=$apikey&remix=true";
 
-my $page = 1;
+my $page = scalar(keys %ids);
 while (1) {
     my $content = get(sprintf($baseurl, $page));
     if (!defined($content)) {
         warn $!;
     }
+    warn "got json";
     my $data;
     eval {
         $data = from_json($content);
@@ -61,20 +62,27 @@ while (1) {
     
     my $track_url = $data->{dataset}[0]{track_url};
     my $download_url = "$track_url/download";
+    warn "getting data";
     my $rawdata = getstore($download_url, "fma.tmp");
     print length($rawdata)."\n";
     my $ua = LWP::UserAgent->new;
     my $play = "off";
-    if (rand() < 0.001) {
+    my $playchoice = rand();
+    warn $playchoice;
+    if ($playchoice < 0.05) {
+	warn "play";
         $play = "on";
     }
+    warn $play;
     my %args = ( add => "on",
                 filetype => "mp3",
-                play => $play,
+                playback => $play,
                 fma_url => $track_url,
                 filedata => ["fma.tmp"]);
-    my $worked = $ua->request(POST "http://$hostport:9001/upload?add=on&filetype=mp3", Content => \%args, Content_Type => 'form-data');
+    my $worked = $ua->request(POST "http://$hostport:9001/upload", Content => \%args, Content_Type => 'form-data');
     print $worked->code;
+   print " ";
+   print localtime;
    print " ";
 #    print $worked->content;
     print $track_id;

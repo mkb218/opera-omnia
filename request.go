@@ -28,14 +28,15 @@ type SegSortSlice struct {
 }
 
 const Loudness_min = -20
-const TimbreWeight = 14
-const PitchWeight = 10
+const TimbreWeight = 5
+const PitchWeight = 20
 const LoudStartWeight = 0
 const LoudMaxWeight = 0
 const DurationWeight = 0
-const BeatWeight = 15
+const BeatWeight = 1
 const ConfidenceWeight = 0
 const IdentityWeight = 10000
+const DistanceThresh = 50.0
 
 func Distance(s, s0 *Segment) float64 {
     var timbre = timbre_distance(s, s0)
@@ -197,7 +198,8 @@ func RequestProc() {
 			expectedlen := float64(0)
 			outlen := float64(0)
 			var totdist float64
-			for _, segment := range s.Segments {
+			
+			for n, segment := range s.Segments {
 				// var ss SegSortSlice
 //				m := make(map[SegmentID]bool)
 /*				var pitches = []int{12,12,12}
@@ -243,16 +245,21 @@ func RequestProc() {
 							}
 							closestDistance = thisDist
 							nearestSeg = k
+							if thisDist < DistanceThresh {
+								log.Println("distance threshold reached")
+								break
+							}
 						}
 					}
 				}
+				log.Println("playback progress", n, len(s.Segments))
 
 				// ss.root = segment
 				// sort.Sort(ss)
 				// if len(ss.slice) > 0 {
 					// for snum := 0; snum < len(ss.slice); snum++ {
 				var outs Segment = allSegs.Segs[nearestSeg]
-				totdist += outs.Distance
+				totdist += closestDistance
 						// var mindist float64 = -1
 						// var distcount int
 						// for _, b := range allSegs.Segs {
